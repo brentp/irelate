@@ -49,19 +49,9 @@ func main() {
 
 	merged := I.Merge(streams...)
 	for interval := range I.IRelate(merged, I.CheckRelatedByOverlap, false, 0) {
-		n := len(interval.Related())
-		if n == 0 { continue }
-		vals := 0
-		for _, b := range interval.Related() {
-				vals += b.(CustomInterval).Value()
-		}
-			/*
-				// for bam output:
-				bam := (interval).(*I.Bam)
-				fmt.Fprintf(buf, "%s\t%d\t%d\t%s\t%v\n", bam.Chrom(), bam.Start(), bam.End(), bam.Cigar(), bam.Name(), bam.Seq())
-			*/
-
-		}
+		// for bam output:
+		bam := (interval).(*I.Bam)
+		fmt.Fprintf(buf, "%s\t%d\t%d\t%s\t%v\n", bam.Chrom(), bam.Start(), bam.End(), bam.Cigar(), bam.Name(), bam.Seq())
 
 	}
 	buf.Flush()
