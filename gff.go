@@ -14,35 +14,35 @@ type Gff struct {
 	related []Relatable
 }
 
-func (self *Gff) Chrom() string {
-	return self.Feature.SeqName
+func (g *Gff) Chrom() string {
+	return g.Feature.SeqName
 }
 
-func (self *Gff) Start() uint32 {
-	return uint32(self.Feature.Start() - 1)
+func (g *Gff) Start() uint32 {
+	return uint32(g.Feature.Start() - 1)
 }
-func (self *Gff) End() uint32 {
-	return uint32(self.Feature.End())
+func (g *Gff) End() uint32 {
+	return uint32(g.Feature.End())
 }
-func (self *Gff) Related() []Relatable {
-	return self.related
+func (g *Gff) Related() []Relatable {
+	return g.related
 }
-func (self *Gff) AddRelated(r Relatable) {
-	self.related = append(self.related, r)
-}
-
-func (self *Gff) SetSource(src uint32) {
-	self._source = src
-}
-func (self *Gff) Source() uint32 {
-	return self._source
+func (g *Gff) AddRelated(r Relatable) {
+	g.related = append(g.related, r)
 }
 
-func (self *Gff) Less(other Relatable) bool {
-	if self.Chrom() != other.Chrom() {
-		return self.Chrom() < other.Chrom()
+func (g *Gff) SetSource(src uint32) {
+	g._source = src
+}
+func (g *Gff) Source() uint32 {
+	return g._source
+}
+
+func (g *Gff) Less(other Relatable) bool {
+	if g.Chrom() != other.Chrom() {
+		return g.Chrom() < other.Chrom()
 	}
-	return self.Start() < other.Start()
+	return g.Start() < other.Start()
 }
 
 func GFFToRelatable(file string) RelatableChannel {

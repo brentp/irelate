@@ -15,39 +15,39 @@ type Bam struct {
 	chrom   *string
 }
 
-func (self *Bam) Chrom() string {
-	return *(self.chrom)
+func (a *Bam) Chrom() string {
+	return *(a.chrom)
 }
 
 // cast to 32 bits.
-func (self *Bam) Start() uint32 {
-	return uint32(self.Record.Start())
+func (a *Bam) Start() uint32 {
+	return uint32(a.Record.Start())
 }
 
-func (self *Bam) End() uint32 {
-	return uint32(self.Record.End())
+func (a *Bam) End() uint32 {
+	return uint32(a.Record.End())
 }
 
-func (self *Bam) Source() uint32 {
-	return self.source
+func (a *Bam) Source() uint32 {
+	return a.source
 }
 
-func (self *Bam) SetSource(src uint32) {
-	self.source = src
+func (a *Bam) SetSource(src uint32) {
+	a.source = src
 }
 
-func (self *Bam) AddRelated(b Relatable) {
-	self.related = append(self.related, b)
+func (a *Bam) AddRelated(b Relatable) {
+	a.related = append(a.related, b)
 }
-func (self *Bam) Related() []Relatable {
-	return self.related
+func (a *Bam) Related() []Relatable {
+	return a.related
 }
 
-func (self *Bam) Less(other Relatable) bool {
-	if self.Chrom() != other.Chrom() {
-		return self.Chrom() < other.Chrom()
+func (a *Bam) Less(other Relatable) bool {
+	if a.Chrom() != other.Chrom() {
+		return a.Chrom() < other.Chrom()
 	}
-	return self.Start() < other.Start()
+	return a.Start() < other.Start()
 }
 
 func BamToRelatable(file string) RelatableChannel {
