@@ -1,7 +1,9 @@
 // Streaming relation (overlap, distance, KNN) testing of (any number of) sorted files of intervals.
 package irelate
 
-import "container/heap"
+import (
+	"container/heap"
+)
 
 // Relatable provides all the methods for irelate to function.
 // See Interval in interval.go for a class that satisfies this interface.
@@ -61,12 +63,16 @@ func CheckKNN(a Relatable, b Relatable) bool {
 }
 
 // filter rewrites the input-slice to remove nils.
-func filter(s []Relatable) []Relatable {
+func filter(s []Relatable, nils int) []Relatable {
+	if len(s) == nils {
+		return s[:0]
+	}
+
 	j := 0
 	for _, v := range s {
 		if v != nil {
 			s[j] = v
-			j += 1
+			j++
 		}
 	}
 	return s[:j]
@@ -86,12 +92,12 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 // testing. IRelate receives merged, ordered Relatables via stream and takes
 // function that checks if they are related (see CheckRelatedByOverlap).
 // It is guaranteed that !b.Less(a) is true (we can't guarantee that a.Less(b)
-// is true since they may have the same start). Once check_related returns false,
+// is true since they may have the same start). Once checkRelated returns false,
 // it is assumed that no other `b` Relatables could possibly be related to `a`
 // and so `a` is sent to the returnQ. It is likely that includeSameSourceRelations
 // will only be set to true if one is doing something like a merge.
 func IRelate(stream RelatableChannel,
-	check_related func(a Relatable, b Relatable) bool,
+	checkRelated func(a Relatable, b Relatable) bool,
 	includeSameSourceRelations bool,
 	relativeTo int) chan Relatable {
 
@@ -99,42 +105,42 @@ func IRelate(stream RelatableChannel,
 	go func() {
 
 		// use the cache to keep relatables to test against.
-		cache := make([]Relatable, 1, 128)
+		cache := make([]Relatable, 1, 256)
 		cache[0] = <-stream
 
 		// Use sendQ to make sure we output in sorted order.
 		// We know we can print something when sendQ.minStart < cache.minStart
 		sendQ := make(relatableQueue, 0, 128)
-		nils := false
+		nils := 0
 
 		for interval := range stream {
+
+			// TODO: reverse cache so that removing the last element (most common case)
+			// is simply a matter of setting len(cache) = len(cache) - 1
 			for i, c := range cache {
-				if c == nil {
-					continue
-				}
-				// tried using futures for check_related to parallelize... got slower
-				if check_related(c, interval) {
+				// tried using futures for checkRelated to parallelize... got slower
+				if checkRelated(c, interval) {
 					relate(c, interval, includeSameSourceRelations, relativeTo)
 				} else {
 					if relativeTo == -1 || c.Source() == uint32(relativeTo) {
 						heap.Push(&sendQ, c)
 					}
 					cache[i] = nil
-					nils = true
+					nils++
 				}
 			}
 
 			// only do this when we have a lot of nils as it's expensive to create a new slice.
-			if nils {
+			if nils > 0 {
 				// remove nils from the cache (must do this before sending)
-				cache, nils = filter(cache), false
+				cache, nils = filter(cache, nils), 0
 				// send the elements from cache in order
 				sendSortedRelatables(&sendQ, cache, out)
 			}
 			cache = append(cache, interval)
 
 		}
-		for _, c := range filter(cache) {
+		for _, c := range filter(cache, nils) {
 			if relativeTo == -1 || c.Source() == uint32(relativeTo) {
 				heap.Push(&sendQ, c)
 			}
