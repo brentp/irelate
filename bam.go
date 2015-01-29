@@ -3,9 +3,8 @@
 package irelate
 
 import (
-	"io"
-
 	boom "code.google.com/p/biogo.boom"
+	"io"
 )
 
 type Bam struct {
@@ -37,7 +36,12 @@ func (a *Bam) SetSource(src uint32) {
 }
 
 func (a *Bam) AddRelated(b Relatable) {
-	a.related = append(a.related, b)
+	if a.related == nil {
+		a.related = make([]Relatable, 1, 2)
+		a.related[0] = b
+	} else {
+		a.related = append(a.related, b)
+	}
 }
 func (a *Bam) Related() []Relatable {
 	return a.related
@@ -74,7 +78,7 @@ func BamToRelatable(file string) RelatableChannel {
 				continue
 			}
 			bam := Bam{Record: rec, chrom: &(names[rec.RefID()]),
-				related: make([]Relatable, 0, 2)}
+				related: nil}
 			ch <- &bam
 		}
 		close(ch)
