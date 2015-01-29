@@ -48,10 +48,11 @@ func main() {
 	buf := bufio.NewWriter(os.Stdout)
 
 	merged := I.Merge(streams...)
+	//for interval := range I.IRelate(merged, I.CheckRelatedByOverlap) {
 	for interval := range I.IRelate(merged, I.CheckRelatedByOverlap, false, 0) {
 		// for bam output:
-		bam := (interval).(*I.Bam)
-		fmt.Fprintf(buf, "%s\t%d\t%d\t%s\t%v\n", bam.Chrom(), bam.Start(), bam.End(), bam.Cigar(), bam.Name(), bam.Seq())
+		// bam := *(interval).(*I.Bam)
+		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 
 	}
 	buf.Flush()
