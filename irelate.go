@@ -78,7 +78,8 @@ func filter(s []Relatable, nils int) []Relatable {
 	return s[:j]
 }
 
-// send the relatables to the channel in sorted order
+// Send the relatables to the channel in sorted order.
+// Check that we couldn't later get an item with a lower start from the current cache.
 func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Relatable) {
 	var j int
 	for j = 0; j < len(*sendQ) && (len(cache) == 0 || (*sendQ)[j].(Relatable).Less(cache[0])); j++ {
@@ -110,7 +111,7 @@ func IRelate(stream RelatableChannel,
 
 		// Use sendQ to make sure we output in sorted order.
 		// We know we can print something when sendQ.minStart < cache.minStart
-		sendQ := make(relatableQueue, 0, 128)
+		sendQ := make(relatableQueue, 0, 256)
 		nils := 0
 
 		for interval := range stream {
@@ -134,8 +135,11 @@ func IRelate(stream RelatableChannel,
 			if nils > 0 {
 				// remove nils from the cache (must do this before sending)
 				cache, nils = filter(cache, nils), 0
-				// send the elements from cache in order
-				sendSortedRelatables(&sendQ, cache, out)
+				// send the elements from cache in order.
+				// use heuristic to minimize the sending.
+				if len(sendQ) > 128 {
+					sendSortedRelatables(&sendQ, cache, out)
+				}
 			}
 			cache = append(cache, interval)
 
