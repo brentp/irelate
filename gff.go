@@ -12,6 +12,7 @@ type Gff struct {
 	*gff.Feature
 	_source uint32
 	related []Relatable
+	index   uint32
 }
 
 func (g *Gff) Chrom() string {
@@ -24,11 +25,8 @@ func (g *Gff) Start() uint32 {
 func (g *Gff) End() uint32 {
 	return uint32(g.Feature.End())
 }
-func (g *Gff) Related() []Relatable {
-	return g.related
-}
-func (g *Gff) AddRelated(r Relatable) {
-	g.related = append(g.related, r)
+func (g *Gff) Index() *uint32 {
+	return &g.index
 }
 
 func (g *Gff) SetSource(src uint32) {

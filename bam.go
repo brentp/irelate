@@ -12,6 +12,7 @@ type Bam struct {
 	source  uint32
 	related []Relatable
 	chrom   *string
+	index   uint32
 }
 
 func (a *Bam) Chrom() string {
@@ -34,17 +35,8 @@ func (a *Bam) Source() uint32 {
 func (a *Bam) SetSource(src uint32) {
 	a.source = src
 }
-
-func (a *Bam) AddRelated(b Relatable) {
-	if a.related == nil {
-		a.related = make([]Relatable, 1, 2)
-		a.related[0] = b
-	} else {
-		a.related = append(a.related, b)
-	}
-}
-func (a *Bam) Related() []Relatable {
-	return a.related
+func (a *Bam) Index() *uint32 {
+	return &a.index
 }
 
 func (a *Bam) Less(other Relatable) bool {

@@ -14,6 +14,7 @@ type Vcf struct {
 	*vcf.Variant
 	related []Relatable
 	source  uint32
+	index   uint32
 }
 
 func (v *Vcf) Source() uint32 {
@@ -36,12 +37,8 @@ func (v *Vcf) Chrom() string {
 	return v.Variant.Chrom
 }
 
-func (v *Vcf) AddRelated(o Relatable) {
-	v.related = append(v.related, o)
-}
-
-func (v *Vcf) Related() []Relatable {
-	return v.related
+func (v *Vcf) Index() *uint32 {
+	return &v.index
 }
 
 func (v *Vcf) Less(o Relatable) bool {
