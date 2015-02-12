@@ -7,35 +7,38 @@ import (
 
 // Relatable provides all the methods for irelate to function.
 // See Interval in interval.go for a class that satisfies this interface.
-// Related() likely returns and AddRelated() likely appends to a slice of
-// relatables. Note that for performance reasons, Relatable should be implemented
+// Note that for performance reasons, Relatable should be implemented
 // as a pointer to your data-structure (see Interval).
 type Relatable interface {
 	Chrom() string
 	Start() uint32
 	End() uint32
-	Related() []Relatable // A slice of related Relatable's filled by IRelate
-	AddRelated(Relatable) // Adds to the slice of relatables
-	Source() uint32       // Internally marks the source (file/stream) of the Relatable
+	Source() uint32 // Internally marks the source (file/stream) of the Relatable
 	SetSource(source uint32)
 	Less(other Relatable) bool // Determines order of the relatables (chrom, start)
 }
 
+type Relatables struct {
+	Relatable
+	Related []Relatable
+}
+
 // RelatableChannel
 type RelatableChannel chan Relatable
+type RelatablesChannel chan Relatables
 
-func relate(a Relatable, b Relatable, includeSameSourceRelations bool, relativeTo int) {
+func relate(a Relatable, b Relatable, related map[Relatable][]Relatable, includeSameSourceRelations bool, relativeTo int) {
 	if (a.Source() != b.Source()) || includeSameSourceRelations {
-		if relativeTo == -1 {
-			a.AddRelated(b)
-			b.AddRelated(a)
-		} else {
+		if relativeTo != -1 {
 			if uint32(relativeTo) == a.Source() {
-				a.AddRelated(b)
+				related[a] = append(related[a], b)
 			}
 			if uint32(relativeTo) == b.Source() {
-				b.AddRelated(a)
+				related[b] = append(related[b], a)
 			}
+		} else {
+			related[a] = append(related[a], b)
+			related[b] = append(related[b], a)
 		}
 	}
 }
@@ -45,21 +48,6 @@ func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
 	distance := uint32(0)
 	// note with distance == 0 this just overlap.
 	return (b.Start()-distance < a.End()) && (b.Chrom() == a.Chrom())
-}
-
-// CheckKNN relates an interval to its k-nearest neighbors.
-// The reporting function will have to do some filtering since this is only
-// guaranteed to associate *at least* k neighbors, but it could be returning extra.
-func CheckKNN(a Relatable, b Relatable) bool {
-	// the first n checked would be the n_closest, but need to consider ties
-	// the report function can decide what to do with them.
-	k := 4
-	r := a.Related()
-	if len(r) >= k {
-		// TODO: double-check this.
-		return r[len(r)-1].Start()-a.End() < b.Start()-a.End()
-	}
-	return true
 }
 
 // filter rewrites the input-slice to remove nils.
@@ -80,12 +68,15 @@ func filter(s []Relatable, nils int) []Relatable {
 
 // Send the relatables to the channel in sorted order.
 // Check that we couldn't later get an item with a lower start from the current cache.
-func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Relatable) {
+func sendSortedRelatables(sendQ *relatableQueue, related map[Relatable][]Relatable, cache []Relatable, out chan Relatables) {
 	var j int
 	for j = 0; j < len(*sendQ) && (len(cache) == 0 || (*sendQ)[j].(Relatable).Less(cache[0])); j++ {
 	}
+	var r Relatable
 	for i := 0; i < j; i++ {
-		out <- heap.Pop(sendQ).(Relatable)
+		r = heap.Pop(sendQ).(Relatable)
+		out <- Relatables{r, related[r]}
+		delete(related, r)
 	}
 }
 
@@ -100,11 +91,12 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 func IRelate(stream RelatableChannel,
 	checkRelated func(a Relatable, b Relatable) bool,
 	includeSameSourceRelations bool,
-	relativeTo int) chan Relatable {
+	relativeTo int) chan Relatables {
 
-	out := make(chan Relatable, 64)
+	out := make(chan Relatables, 64)
 	go func() {
 
+		var related = make(map[Relatable][]Relatable)
 		// use the cache to keep relatables to test against.
 		cache := make([]Relatable, 1, 256)
 		cache[0] = <-stream
@@ -120,8 +112,9 @@ func IRelate(stream RelatableChannel,
 			// is simply a matter of setting len(cache) = len(cache) - 1
 			for i, c := range cache {
 				// tried using futures for checkRelated to parallelize... got slower
+				// TODO: try again since relate() is now expensive as it contains all allocations.
 				if checkRelated(c, interval) {
-					relate(c, interval, includeSameSourceRelations, relativeTo)
+					relate(c, interval, related, includeSameSourceRelations, relativeTo)
 				} else {
 					if relativeTo == -1 || c.Source() == uint32(relativeTo) {
 						heap.Push(&sendQ, c)
@@ -138,7 +131,7 @@ func IRelate(stream RelatableChannel,
 				// send the elements from cache in order.
 				// use heuristic to minimize the sending.
 				if len(sendQ) > 128 {
-					sendSortedRelatables(&sendQ, cache, out)
+					sendSortedRelatables(&sendQ, related, cache, out)
 				}
 			}
 			cache = append(cache, interval)
@@ -150,7 +143,8 @@ func IRelate(stream RelatableChannel,
 			}
 		}
 		for i := 0; i < len(sendQ); i++ {
-			out <- sendQ[i]
+			r := sendQ[i].(Relatable)
+			out <- Relatables{r, related[r]}
 		}
 		close(out)
 	}()
