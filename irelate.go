@@ -96,6 +96,8 @@ func IRelate(stream RelatableChannel,
 	out := make(chan Relatables, 64)
 	go func() {
 
+		// TODO: merge cache and related to reduce mem use.
+		// TODO: set an idx in Merge and use map[int][]Relatable to avoid some hashing.
 		var related = make(map[Relatable][]Relatable)
 		// use the cache to keep relatables to test against.
 		cache := make([]Relatable, 1, 256)
