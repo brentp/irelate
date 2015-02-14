@@ -12,7 +12,7 @@ type Bam struct {
 	source  uint32
 	related []Relatable
 	chrom   *string
-	index   uint32
+	index   int
 }
 
 func (a *Bam) Chrom() string {
@@ -35,7 +35,7 @@ func (a *Bam) Source() uint32 {
 func (a *Bam) SetSource(src uint32) {
 	a.source = src
 }
-func (a *Bam) Index() *uint32 {
+func (a *Bam) Index() *int {
 	return &a.index
 }
 

@@ -15,7 +15,7 @@ type Interval struct {
 	end    uint32
 	line   string
 	source uint32
-	index  uint32
+	index  int
 }
 
 func (i *Interval) Chrom() string        { return i.chrom }
@@ -23,7 +23,7 @@ func (i *Interval) Start() uint32        { return i.start }
 func (i *Interval) End() uint32          { return i.end }
 func (i *Interval) Source() uint32       { return i.source }
 func (i *Interval) SetSource(src uint32) { i.source = src }
-func (i *Interval) Index() *uint32       { return &i.index }
+func (i *Interval) Index() *int          { return &i.index }
 
 // Interval.Less() determines the order of intervals
 func (i *Interval) Less(other Relatable) bool {

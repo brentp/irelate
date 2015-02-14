@@ -3,6 +3,8 @@ package irelate
 
 import (
 	"container/heap"
+	_ "fmt"
+	_ "os"
 )
 
 // Relatable provides all the methods for irelate to function.
@@ -16,7 +18,7 @@ type Relatable interface {
 	Source() uint32 // Internally marks the source (file/stream) of the Relatable
 	SetSource(source uint32)
 	Less(other Relatable) bool // Determines order of the relatables (chrom, start)
-	Index() *uint32
+	Index() *int
 }
 
 type Relatables struct {
@@ -28,20 +30,27 @@ type Relatables struct {
 type RelatableChannel chan Relatable
 type RelatablesChannel chan Relatables
 
-type RelatableMap map[uint32][]Relatable
+type RelatableMap map[int][]Relatable
 
-func relate(a Relatable, b Relatable, related RelatableMap, includeSameSourceRelations bool, relativeTo int) {
+func relate(a Relatable, b Relatable, cache RelatableMap, includeSameSourceRelations bool, relativeTo int) {
 	if (a.Source() != b.Source()) || includeSameSourceRelations {
+		if *a.Index() < 0 {
+			panic("b shouldn't happen")
+		}
+		if *b.Index() < 0 {
+			panic("a shouldn't happen")
+		}
 		if relativeTo != -1 {
 			if uint32(relativeTo) == a.Source() {
-				related[*a.Index()] = append(related[*a.Index()], b)
+				cache[*a.Index()] = append(cache[*a.Index()], b)
+				//fmt.Fprintf(os.Stderr, "%d\n", len((*cache)[*a.Index()]))
 			}
 			if uint32(relativeTo) == b.Source() {
-				related[*b.Index()] = append(related[*b.Index()], a)
+				cache[*b.Index()] = append(cache[*b.Index()], a)
 			}
 		} else {
-			related[*a.Index()] = append(related[*a.Index()], b)
-			related[*b.Index()] = append(related[*b.Index()], a)
+			cache[*a.Index()] = append(cache[*a.Index()], b)
+			cache[*b.Index()] = append(cache[*b.Index()], a)
 		}
 	}
 }
@@ -53,33 +62,37 @@ func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
 	return (b.Start()-distance < a.End()) && (b.Chrom() == a.Chrom())
 }
 
-// filter rewrites the input-slice to remove nils.
-func filter(s []Relatable, nils int) []Relatable {
-	if len(s) == nils {
-		return s[:0]
-	}
-
-	j := 0
-	for _, v := range s {
-		if v != nil {
-			s[j] = v
-			j++
-		}
-	}
-	return s[:j]
-}
-
 // Send the relatables to the channel in sorted order.
 // Check that we couldn't later get an item with a lower start from the current cache.
-func sendSortedRelatables(sendQ *relatableQueue, related RelatableMap, cache []Relatable, out chan Relatables) {
+func sendSortedRelatables(sendQ *relatableQueue, cache RelatableMap, out chan Relatables) {
+	// TODO: need to skip things in cache that are in sendQ. This should happen by clist[0].Index() > 0...
+	kmin := int(^uint32(0))
+	for k, clist := range cache {
+		if k < kmin && *(clist[0].Index()) > 0 {
+			kmin = k
+		}
+		//fmt.Fprintf(os.Stderr, "%d\t", *clist[0].Index())
+	}
+	//fmt.Fprintf(os.Stderr, "\n")
+	if kmin == int(^uint32(0)) {
+		return
+	}
+	//fmt.Fprintf(os.Stderr, "kmin: %d\t", kmin)
+	//fmt.Fprintf(os.Stderr, "%v", cache[kmin][0])
+	//fmt.Fprintf(os.Stderr, "KMIN Index: %d\n", *cache[kmin][0].Index())
+	//fmt.Fprintf(os.Stderr, "sendQ[0] %v\n", (*sendQ)[0].(Relatable))
 	var j int
-	for j = 0; j < len(*sendQ) && (len(cache) == 0 || (*sendQ)[j].(Relatable).Less(cache[0])); j++ {
+	for j = 0; j < len(*sendQ) && (len(cache) == 0 || (*sendQ)[j].(Relatable).Less(cache[kmin][0])); j++ {
 	}
 	var r Relatable
+	//fmt.Fprintf(os.Stderr, "j: %d\n", j)
+	//fmt.Fprintf(os.Stderr, "len(sendQ): %d\n", len(*sendQ))
 	for i := 0; i < j; i++ {
 		r = heap.Pop(sendQ).(Relatable)
-		out <- Relatables{r, related[*r.Index()]}
-		delete(related, *r.Index())
+		//c := cache[*r.Index()]
+		//print(len(c))
+		out <- Relatables{r, cache[-*r.Index()]}
+		delete(cache, -*r.Index())
 	}
 }
 
@@ -99,56 +112,65 @@ func IRelate(stream RelatableChannel,
 	out := make(chan Relatables, 64)
 	go func() {
 
-		// TODO: merge cache and related to reduce mem use.
-		var related = make(RelatableMap)
+		var cache = make(RelatableMap)
 		// use the cache to keep relatables to test against.
-		cache := make([]Relatable, 1, 256)
-		cache[0] = <-stream
+		interval := <-stream
+		cache[*(interval.Index())] = make([]Relatable, 1)
+		// the self is alwasy the first element in the slice.
+		cache[*interval.Index()][0] = interval
 
 		// Use sendQ to make sure we output in sorted order.
 		// We know we can print something when sendQ.minStart < cache.minStart
 		sendQ := make(relatableQueue, 0, 256)
-		nils := 0
 
-		for interval := range stream {
+		for interval = range stream {
 
 			// TODO: reverse cache so that removing the last element (most common case)
 			// is simply a matter of setting len(cache) = len(cache) - 1
-			for i, c := range cache {
+			for _, clist := range cache {
+				if *clist[0].Index() < 0 {
+					continue
+				}
+				c := clist[0]
 				// tried using futures for checkRelated to parallelize... got slower
 				// TODO: try again since relate() is now expensive as it contains all allocations.
 				if checkRelated(c, interval) {
-					relate(c, interval, related, includeSameSourceRelations, relativeTo)
+					relate(c, interval, cache, includeSameSourceRelations, relativeTo)
 				} else {
+					*c.Index() = -(*c.Index())
 					if relativeTo == -1 || c.Source() == uint32(relativeTo) {
+						// if it's negative, then it has been used.
 						heap.Push(&sendQ, c)
 					}
-					cache[i] = nil
-					nils++
 				}
 			}
+			//fmt.Fprintf(os.Stderr, "len Q: %d; len cache: %d\n", len(sendQ), len(cache))
 
 			// only do this when we have a lot of nils as it's expensive to create a new slice.
-			if nils > 0 {
-				// remove nils from the cache (must do this before sending)
-				cache, nils = filter(cache, nils), 0
-				// send the elements from cache in order.
-				// use heuristic to minimize the sending.
-				if len(sendQ) > 128 {
-					sendSortedRelatables(&sendQ, related, cache, out)
+			if len(sendQ) > 128 {
+				sendSortedRelatables(&sendQ, cache, out)
+				for ckey, clist := range cache {
+					if *clist[0].Index() < 0 {
+						delete(cache, ckey)
+					}
 				}
 			}
-			cache = append(cache, interval)
+			cache[*(interval.Index())] = make([]Relatable, 1)
+			cache[*(interval.Index())][0] = interval
 
 		}
-		for _, c := range filter(cache, nils) {
+		for _, clist := range cache {
+			c := clist[0]
+			if *c.Index() < 0 {
+				continue
+			}
 			if relativeTo == -1 || c.Source() == uint32(relativeTo) {
 				heap.Push(&sendQ, c)
 			}
 		}
 		for i := 0; i < len(sendQ); i++ {
 			r := sendQ[i].(Relatable)
-			out <- Relatables{r, related[*r.Index()]}
+			out <- Relatables{r, cache[*r.Index()]}
 		}
 		close(out)
 	}()
@@ -161,7 +183,7 @@ func IRelate(stream RelatableChannel,
 // This uses a priority queue and acts like python's heapq.merge.
 func Merge(streams ...RelatableChannel) RelatableChannel {
 	q := make(relatableQueue, 0, len(streams))
-	j := uint32(0)
+	j := int(1)
 	for i, stream := range streams {
 		interval := <-stream
 		if interval != nil {

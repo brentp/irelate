@@ -14,7 +14,7 @@ type Vcf struct {
 	*vcf.Variant
 	related []Relatable
 	source  uint32
-	index   uint32
+	index   int
 }
 
 func (v *Vcf) Source() uint32 {
@@ -37,7 +37,7 @@ func (v *Vcf) Chrom() string {
 	return v.Variant.Chrom
 }
 
-func (v *Vcf) Index() *uint32 {
+func (v *Vcf) Index() *int {
 	return &v.index
 }
 
