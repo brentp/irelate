@@ -3,30 +3,58 @@ package irelate
 
 import (
 	"container/heap"
+	"fmt"
+	"os"
 )
 
 // Relatable provides all the methods for irelate to function.
 // See Interval in interval.go for a class that satisfies this interface.
-// Related() likely returns and AddRelated() likely appends to a slice of
-// relatables. Note that for performance reasons, Relatable should be implemented
+// Note that for performance reasons, Relatable should be implemented
 // as a pointer to your data-structure (see Interval).
 type Relatable interface {
 	Chrom() string
 	Start() uint32
 	End() uint32
-	Related() []Relatable // A slice of related Relatable's filled by IRelate
-	AddRelated(Relatable) // Adds to the slice of relatables
-	Source() uint32       // Internally marks the source (file/stream) of the Relatable
-	SetSource(source uint32)
 	Less(other Relatable) bool // Determines order of the relatables (chrom, start)
+}
+
+// Related() likely returns and AddRelated() likely appends to a slice of
+type IRelatable interface {
+	Relatable
+	Related() []IRelatable // A slice of related Relatable's filled by IRelate
+	AddRelated(a IRelatable)
+	SetSource(source uint32)
+	Source() uint32 // Internally marks the source (file/stream) of the Relatable
+
+}
+
+type irelatable struct {
+	Relatable
+	related []IRelatable
+	source  uint32
+}
+
+func (i *irelatable) Related() []IRelatable {
+	return i.related
+}
+func (i *irelatable) AddRelated(r IRelatable) {
+	i.related = append(i.related, r)
+}
+func (i *irelatable) Source() uint32 {
+	return i.source
+}
+func (i *irelatable) SetSource(src uint32) {
+	i.source = src
 }
 
 // RelatableChannel
 type RelatableChannel chan Relatable
+type IRelatableChannel chan IRelatable
 
-func relate(a Relatable, b Relatable, includeSameSourceRelations bool, relativeTo int) {
+func relate(a IRelatable, b IRelatable, includeSameSourceRelations bool, relativeTo int) {
 	if (a.Source() != b.Source()) || includeSameSourceRelations {
 		if relativeTo == -1 {
+			fmt.Fprintf(os.Stderr, "adding")
 			a.AddRelated(b)
 			b.AddRelated(a)
 		} else {
@@ -41,29 +69,14 @@ func relate(a Relatable, b Relatable, includeSameSourceRelations bool, relativeT
 }
 
 // CheckRelatedByOverlap returns true if Relatables overlap.
-func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
+func CheckRelatedByOverlap(a IRelatable, b IRelatable) bool {
 	distance := uint32(0)
 	// note with distance == 0 this just overlap.
 	return (b.Start()-distance < a.End()) && (b.Chrom() == a.Chrom())
 }
 
-// CheckKNN relates an interval to its k-nearest neighbors.
-// The reporting function will have to do some filtering since this is only
-// guaranteed to associate *at least* k neighbors, but it could be returning extra.
-func CheckKNN(a Relatable, b Relatable) bool {
-	// the first n checked would be the n_closest, but need to consider ties
-	// the report function can decide what to do with them.
-	k := 4
-	r := a.Related()
-	if len(r) >= k {
-		// TODO: double-check this.
-		return r[len(r)-1].Start()-a.End() < b.Start()-a.End()
-	}
-	return true
-}
-
 // filter rewrites the input-slice to remove nils.
-func filter(s []Relatable, nils int) []Relatable {
+func filter(s []IRelatable, nils int) []IRelatable {
 	if len(s) == nils {
 		return s[:0]
 	}
@@ -80,12 +93,12 @@ func filter(s []Relatable, nils int) []Relatable {
 
 // Send the relatables to the channel in sorted order.
 // Check that we couldn't later get an item with a lower start from the current cache.
-func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Relatable) {
+func sendSortedRelatables(sendQ *relatableQueue, cache []IRelatable, out chan IRelatable) {
 	var j int
 	for j = 0; j < len(*sendQ) && (len(cache) == 0 || (*sendQ)[j].(Relatable).Less(cache[0])); j++ {
 	}
 	for i := 0; i < j; i++ {
-		out <- heap.Pop(sendQ).(Relatable)
+		out <- heap.Pop(sendQ).(IRelatable)
 	}
 }
 
@@ -97,16 +110,16 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 // it is assumed that no other `b` Relatables could possibly be related to `a`
 // and so `a` is sent to the returnQ. It is likely that includeSameSourceRelations
 // will only be set to true if one is doing something like a merge.
-func IRelate(stream RelatableChannel,
-	checkRelated func(a Relatable, b Relatable) bool,
+func IRelate(stream IRelatableChannel,
+	checkRelated func(a IRelatable, b IRelatable) bool,
 	includeSameSourceRelations bool,
-	relativeTo int) chan Relatable {
+	relativeTo int) chan IRelatable {
 
-	out := make(chan Relatable, 64)
+	out := make(chan IRelatable, 64)
 	go func() {
 
 		// use the cache to keep relatables to test against.
-		cache := make([]Relatable, 1, 256)
+		cache := make([]IRelatable, 1, 256)
 		cache[0] = <-stream
 
 		// Use sendQ to make sure we output in sorted order.
@@ -161,30 +174,31 @@ func IRelate(stream RelatableChannel,
 // Streams of Relatable's from different source must be merged to send
 // to IRelate.
 // This uses a priority queue and acts like python's heapq.merge.
-func Merge(streams ...RelatableChannel) RelatableChannel {
+func Merge(streams ...RelatableChannel) IRelatableChannel {
 	q := make(relatableQueue, 0, len(streams))
+	var interval IRelatable
 	for i, stream := range streams {
-		interval := <-stream
-		if interval != nil {
+		iv := <-stream
+		if iv != nil {
+			interval = &irelatable{iv, nil, uint32(i)}
 			interval.SetSource(uint32(i))
 			heap.Push(&q, interval)
 		}
 	}
-	ch := make(chan Relatable, 8)
+	ch := make(chan IRelatable, 8)
 	go func() {
-		var interval Relatable
+		var interval IRelatable
 		for len(q) > 0 {
-			interval = heap.Pop(&q).(Relatable)
+			interval = heap.Pop(&q).(IRelatable)
 			source := interval.Source()
 			ch <- interval
 			// need the case/select stmt here to handle end of each stream
-			select {
 			// pull the next interval from the same source.
-			case next_interval, ok := <-streams[source]:
-				if ok {
-					next_interval.SetSource(source)
-					heap.Push(&q, next_interval)
-				}
+			next_iv, ok := <-streams[source]
+			if ok {
+				next_interval := &irelatable{next_iv, nil, source}
+				next_interval.SetSource(source)
+				heap.Push(&q, next_interval)
 			}
 		}
 		close(ch)
