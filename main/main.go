@@ -31,9 +31,11 @@ func main() {
 	files := flag.Args()
 
 	streams := make([]I.RelatableChannel, 0)
+	s := I.NewStack(1000)
+
 	for _, f := range files {
 		// Streamer automatically returns a Relatalbe Channel for bam/gff/bed(.gz)
-		streams = append(streams, I.Streamer(f))
+		streams = append(streams, I.Streamer(f, s))
 	}
 
 	if *cpuProfile {
@@ -52,8 +54,10 @@ func main() {
 	for interval := range I.IRelate(merged, I.CheckRelatedByOverlap, false, 0) {
 		// for bam output:
 		// bam := *(interval).(*I.Bam)
-		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
-
+		if interval.Source() == 0 {
+			fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
+		}
+		s.Put(interval.(*I.Interval))
 	}
 	buf.Flush()
 

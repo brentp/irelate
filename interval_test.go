@@ -38,7 +38,8 @@ func TestIntervalSource(t *testing.T) {
 
 func TestIntervalLine(t *testing.T) {
 	s := "chr1\t1235\t4567\tasdf"
-	i := IntervalFromBedLine(s)
+	stack := NewStack(100)
+	i := IntervalFromBedLine(s, stack)
 	if i.Start() != uint32(1235) {
 		t.Error("expected start of 1235")
 	}

@@ -35,13 +35,17 @@ func (i *Interval) SetSource(src uint32) { i.source = src }
 
 // Interval.Less() determines the order of intervals
 func (i *Interval) Less(other Relatable) bool {
-	if i.Chrom() != other.Chrom() {
+	a, b := i.Chrom(), other.Chrom()
+	if a[len(a)-1] != b[len(b)-1] {
 		return i.Chrom() < other.Chrom()
+	}
+	if i.Start() == other.Start() {
+		return i.End() < other.End()
 	}
 	return i.Start() < other.Start()
 }
 
-func IntervalFromBedLine(line string) Relatable {
+func IntervalFromBedLine(line string, stack *Stack) Relatable {
 	fields := strings.SplitN(line, "\t", 4)
 	start, err := strconv.ParseUint(fields[1], 10, 32)
 	if err != nil {
@@ -52,6 +56,9 @@ func IntervalFromBedLine(line string) Relatable {
 		panic(err)
 	}
 
-	i := Interval{chrom: fields[0], start: uint32(start), end: uint32(end), related: nil}
-	return &i
+	i := stack.Get()
+	i.chrom = fields[0]
+	i.start = uint32(start)
+	i.end = uint32(end)
+	return i
 }

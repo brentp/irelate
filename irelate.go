@@ -125,6 +125,9 @@ func IRelate(stream RelatableChannel,
 				} else {
 					if relativeTo == -1 || c.Source() == uint32(relativeTo) {
 						heap.Push(&sendQ, c)
+					} else {
+						iv := c.(*Interval)
+						iv.related = nil //iv.related[:0]
 					}
 					cache[i] = nil
 					nils++
