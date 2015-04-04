@@ -45,7 +45,7 @@ func (i *Interval) Less(other Relatable) bool {
 	return i.Start() < other.Start()
 }
 
-func IntervalFromBedLine(line string, stack *Stack) Relatable {
+func IntervalFromBedLine(line string, cache *IFifo) Relatable {
 	fields := strings.SplitN(line, "\t", 4)
 	start, err := strconv.ParseUint(fields[1], 10, 32)
 	if err != nil {
@@ -56,7 +56,7 @@ func IntervalFromBedLine(line string, stack *Stack) Relatable {
 		panic(err)
 	}
 
-	i := stack.Get()
+	i := cache.Get().(*Interval)
 	i.chrom = fields[0]
 	i.start = uint32(start)
 	i.end = uint32(end)

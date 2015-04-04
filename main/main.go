@@ -31,7 +31,7 @@ func main() {
 	files := flag.Args()
 
 	streams := make([]I.RelatableChannel, 0)
-	s := I.NewStack(1000)
+	s := I.NewIFifo(1000, func() interface{} { return &I.Interval{} })
 
 	for _, f := range files {
 		// Streamer automatically returns a Relatalbe Channel for bam/gff/bed(.gz)
