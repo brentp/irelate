@@ -5,16 +5,16 @@ import (
 	"testing"
 )
 
-func BenchmarkFull(b *testing.B) {
+func benchmarkStreams(nStreams int, b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		streams := make([]RelatableChannel, 0)
 		f := "data/test.bed.gz"
 		s := ififo.NewIFifo(1000, func() interface{} { return &Interval{} })
 
-		streams = append(streams, Streamer(f, s))
-		streams = append(streams, Streamer(f, s))
-		streams = append(streams, Streamer(f, s))
+		for i := 0; i < nStreams; i++ {
+			streams = append(streams, Streamer(f, s))
+		}
 
 		merged := Merge(streams...)
 
@@ -24,3 +24,6 @@ func BenchmarkFull(b *testing.B) {
 
 	}
 }
+
+func Benchmark2Streams(b *testing.B) { benchmarkStreams(2, b) }
+func Benchmark3Streams(b *testing.B) { benchmarkStreams(3, b) }
