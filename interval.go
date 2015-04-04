@@ -1,6 +1,7 @@
 package irelate
 
 import (
+	"github.com/brentp/ififo"
 	"strconv"
 	"strings"
 )
@@ -45,7 +46,7 @@ func (i *Interval) Less(other Relatable) bool {
 	return i.Start() < other.Start()
 }
 
-func IntervalFromBedLine(line string, cache *IFifo) Relatable {
+func IntervalFromBedLine(line string, cache *ififo.IFifo) Relatable {
 	fields := strings.SplitN(line, "\t", 4)
 	start, err := strconv.ParseUint(fields[1], 10, 32)
 	if err != nil {

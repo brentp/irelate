@@ -3,6 +3,7 @@ package irelate
 import (
 	"bufio"
 	"compress/gzip"
+	"github.com/brentp/ififo"
 	"io"
 	"os"
 	"strings"
@@ -56,7 +57,7 @@ func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.
-func ScanToRelatable(file string, fn func(line string, cache *IFifo) Relatable, cache *IFifo) RelatableChannel {
+func ScanToRelatable(file string, fn func(line string, cache *ififo.IFifo) Relatable, cache *ififo.IFifo) RelatableChannel {
 	scanner, fh := OpenScanFile(file)
 	ch := make(chan Relatable, 32)
 	go func() {
@@ -87,7 +88,7 @@ func Imax(a uint32, b uint32) uint32 {
 	return a
 }
 
-func Streamer(f string, cache *IFifo) RelatableChannel {
+func Streamer(f string, cache *ififo.IFifo) RelatableChannel {
 	var stream chan Relatable
 	if strings.HasSuffix(f, ".bam") {
 		stream = BamToRelatable(f)
