@@ -57,7 +57,7 @@ func main() {
 		if interval.Source() == 0 {
 			fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 		}
-		s.Put(interval.(*I.Interval))
+		s.Put(interval)
 	}
 	buf.Flush()
 
