@@ -32,7 +32,7 @@ func main() {
 	files := flag.Args()
 
 	streams := make([]I.RelatableChannel, 0)
-	s := ififo.NewIFifo(1000, func() interface{} { return &I.Interval{} })
+	s := ififo.NewIFifo(3000, func() interface{} { return &I.Interval{} })
 
 	for _, f := range files {
 		// Streamer automatically returns a Relatalbe Channel for bam/gff/bed(.gz)
@@ -52,7 +52,7 @@ func main() {
 
 	merged := I.Merge(streams...)
 	//for interval := range I.IRelate(merged, I.CheckRelatedByOverlap) {
-	for interval := range I.IRelate(merged, I.CheckRelatedByOverlap, false, 0) {
+	for interval := range I.IRelate(merged, I.CheckRelatedByOverlap, false, 0, s) {
 		// for bam output:
 		// bam := *(interval).(*I.Bam)
 		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))

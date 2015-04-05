@@ -10,7 +10,7 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		streams := make([]RelatableChannel, 0)
 		f := "data/test.bed.gz"
-		s := ififo.NewIFifo(1000, func() interface{} { return &Interval{} })
+		s := ififo.NewIFifo(3000, func() interface{} { return &Interval{} })
 
 		for i := 0; i < nStreams; i++ {
 			streams = append(streams, Streamer(f, s))
@@ -18,7 +18,7 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 
 		merged := Merge(streams...)
 
-		for interval := range IRelate(merged, CheckRelatedByOverlap, false, 0) {
+		for interval := range IRelate(merged, CheckRelatedByOverlap, false, 0, s) {
 			s.Put(interval)
 		}
 

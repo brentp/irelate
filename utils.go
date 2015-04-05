@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"github.com/brentp/ififo"
+	//gzip "github.com/klauspost/pgzip"
 	"io"
 	"os"
 	"strings"

@@ -3,6 +3,7 @@ package irelate
 
 import (
 	"container/heap"
+	"github.com/brentp/ififo"
 )
 
 // Relatable provides all the methods for irelate to function.
@@ -100,7 +101,8 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 func IRelate(stream RelatableChannel,
 	checkRelated func(a Relatable, b Relatable) bool,
 	includeSameSourceRelations bool,
-	relativeTo int) chan Relatable {
+	relativeTo int,
+	reuse *ififo.IFifo) chan Relatable {
 
 	out := make(chan Relatable, 64)
 	go func() {
@@ -127,7 +129,12 @@ func IRelate(stream RelatableChannel,
 						heap.Push(&sendQ, c)
 					} else {
 						iv := c.(*Interval)
-						iv.related = nil //iv.related[:0]
+						if reuse != nil {
+							iv.related = iv.related[:0]
+							reuse.Put(iv)
+						} else {
+							iv.related = nil
+						}
 					}
 					cache[i] = nil
 					nils++

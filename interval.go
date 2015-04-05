@@ -25,7 +25,7 @@ func (i *Interval) End() uint32          { return i.end }
 func (i *Interval) Related() []Relatable { return i.related }
 func (i *Interval) AddRelated(b Relatable) {
 	if i.related == nil {
-		i.related = make([]Relatable, 1, 4)
+		i.related = make([]Relatable, 1, 48)
 		i.related[0] = b
 	} else {
 		i.related = append(i.related, b)
