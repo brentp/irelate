@@ -40,6 +40,10 @@ func (v *Vcf) AddRelated(o Relatable) {
 	v.related = append(v.related, o)
 }
 
+func (v *Vcf) Clear() {
+	v.related = v.related[:0]
+}
+
 func (v *Vcf) Related() []Relatable {
 	return v.related
 }

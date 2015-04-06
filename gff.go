@@ -27,6 +27,11 @@ func (g *Gff) End() uint32 {
 func (g *Gff) Related() []Relatable {
 	return g.related
 }
+
+func (g *Gff) Clear() {
+	g.related = g.related[:0]
+}
+
 func (g *Gff) AddRelated(r Relatable) {
 	g.related = append(g.related, r)
 }

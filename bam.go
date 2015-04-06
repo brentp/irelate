@@ -43,6 +43,11 @@ func (a *Bam) AddRelated(b Relatable) {
 		a.related = append(a.related, b)
 	}
 }
+
+func (a *Bam) Clear() {
+	a.related = a.related[:0]
+}
+
 func (a *Bam) Related() []Relatable {
 	return a.related
 }

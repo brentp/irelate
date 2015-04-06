@@ -1,9 +1,10 @@
 package irelate
 
 import (
+	"bytes"
 	"github.com/brentp/ififo"
 	"strconv"
-	"strings"
+	"unsafe"
 )
 
 const empty = ""
@@ -23,6 +24,9 @@ func (i *Interval) Chrom() string        { return i.chrom }
 func (i *Interval) Start() uint32        { return i.start }
 func (i *Interval) End() uint32          { return i.end }
 func (i *Interval) Related() []Relatable { return i.related }
+func (i *Interval) Clear() {
+	i.related = i.related[:0]
+}
 func (i *Interval) AddRelated(b Relatable) {
 	if i.related == nil {
 		i.related = make([]Relatable, 1, 48)
@@ -46,19 +50,23 @@ func (i *Interval) Less(other Relatable) bool {
 	return i.Start() < other.Start()
 }
 
-func IntervalFromBedLine(line string, cache *ififo.IFifo) Relatable {
-	fields := strings.SplitN(line, "\t", 4)
-	start, err := strconv.ParseUint(fields[1], 10, 32)
+func unsafeString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+func IntervalFromBedLine(line []byte, cache *ififo.IFifo) Relatable {
+	fields := bytes.SplitN(line, []byte("\t"), 4)
+	start, err := strconv.ParseUint(unsafeString(fields[1]), 10, 32)
 	if err != nil {
 		panic(err)
 	}
-	end, err := strconv.ParseUint(fields[2], 10, 32)
+	end, err := strconv.ParseUint(unsafeString(fields[2]), 10, 32)
 	if err != nil {
 		panic(err)
 	}
 
 	i := cache.Get().(*Interval)
-	i.chrom = fields[0]
+	i.chrom = string(fields[0])
 	i.start = uint32(start)
 	i.end = uint32(end)
 	return i

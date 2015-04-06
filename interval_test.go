@@ -38,7 +38,7 @@ func TestIntervalSource(t *testing.T) {
 }
 
 func TestIntervalLine(t *testing.T) {
-	s := "chr1\t1235\t4567\tasdf"
+	s := []byte("chr1\t1235\t4567\tasdf")
 	stack := ififo.NewIFifo(100, func() interface{} { return &Interval{} })
 	i := IntervalFromBedLine(s, stack)
 	if i.Start() != uint32(1235) {

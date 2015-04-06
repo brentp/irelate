@@ -17,7 +17,8 @@ type Relatable interface {
 	End() uint32
 	Related() []Relatable // A slice of related Relatable's filled by IRelate
 	AddRelated(Relatable) // Adds to the slice of relatables
-	Source() uint32       // Internally marks the source (file/stream) of the Relatable
+	Clear()
+	Source() uint32 // Internally marks the source (file/stream) of the Relatable
 	SetSource(source uint32)
 	Less(other Relatable) bool // Determines order of the relatables (chrom, start)
 }
@@ -128,13 +129,10 @@ func IRelate(stream RelatableChannel,
 					if relativeTo == -1 || c.Source() == uint32(relativeTo) {
 						heap.Push(&sendQ, c)
 					} else {
-						iv := c.(*Interval)
-						if reuse != nil {
-							iv.related = iv.related[:0]
-							reuse.Put(iv)
-						} else {
-							iv.related = nil
-						}
+						// TODO: this could be a problem if we send iv back for re-use
+						// but the caller is still using it.
+						c.Clear()
+						reuse.Put(c)
 					}
 					cache[i] = nil
 					nils++

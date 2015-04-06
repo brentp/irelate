@@ -58,14 +58,14 @@ func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.
-func ScanToRelatable(file string, fn func(line string, cache *ififo.IFifo) Relatable, cache *ififo.IFifo) RelatableChannel {
+func ScanToRelatable(file string, fn func(line []byte, cache *ififo.IFifo) Relatable, cache *ififo.IFifo) RelatableChannel {
 	scanner, fh := OpenScanFile(file)
 	ch := make(chan Relatable, 32)
 	go func() {
 		var i Relatable
 		defer fh.Close()
 		for scanner.Scan() {
-			line := scanner.Text()
+			line := scanner.Bytes()
 			i = fn(line, cache)
 			ch <- i
 		}

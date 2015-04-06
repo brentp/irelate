@@ -56,6 +56,7 @@ func main() {
 		// for bam output:
 		// bam := *(interval).(*I.Bam)
 		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
+		interval.Clear()
 		s.Put(interval)
 	}
 	buf.Flush()
