@@ -18,7 +18,7 @@ func init() {
 
 	signal.Notify(done, os.Interrupt, syscall.SIGIO, syscall.SIGPIPE)
 	go func() {
-		for _ = range done {
+		for range done {
 			os.Exit(0)
 		}
 	}()
