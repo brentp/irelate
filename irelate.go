@@ -178,13 +178,11 @@ func Merge(streams ...RelatableChannel) RelatableChannel {
 			source := interval.Source()
 			ch <- interval
 			// need the case/select stmt here to handle end of each stream
-			select {
 			// pull the next interval from the same source.
-			case next_interval, ok := <-streams[source]:
-				if ok {
-					next_interval.SetSource(source)
-					heap.Push(&q, next_interval)
-				}
+			next_interval, ok := <-streams[source]
+			if ok {
+				next_interval.SetSource(source)
+				heap.Push(&q, next_interval)
 			}
 		}
 		close(ch)
