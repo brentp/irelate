@@ -25,6 +25,9 @@ func (i *Interval) Start() uint32        { return i.start }
 func (i *Interval) End() uint32          { return i.end }
 func (i *Interval) Related() []Relatable { return i.related }
 func (i *Interval) Clear() {
+	for j := range i.related {
+		i.related[j] = nil
+	}
 	i.related = i.related[:0]
 }
 func (i *Interval) AddRelated(b Relatable) {
