@@ -3,7 +3,7 @@ package irelate
 import (
 	"bufio"
 	"compress/gzip"
-	"github.com/brentp/ififo"
+	"sync"
 	//gzip "github.com/klauspost/pgzip"
 	"io"
 	"os"
@@ -58,7 +58,7 @@ func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.
-func ScanToRelatable(file string, fn func(line []byte, cache *ififo.IFifo) Relatable, cache *ififo.IFifo) RelatableChannel {
+func ScanToRelatable(file string, fn func(line []byte, pool *sync.Pool) Relatable, pool *sync.Pool) RelatableChannel {
 	scanner, fh := OpenScanFile(file)
 	ch := make(chan Relatable, 32)
 	go func() {
@@ -66,7 +66,7 @@ func ScanToRelatable(file string, fn func(line []byte, cache *ififo.IFifo) Relat
 		defer fh.Close()
 		for scanner.Scan() {
 			line := scanner.Bytes()
-			i = fn(line, cache)
+			i = fn(line, pool)
 			ch <- i
 		}
 
@@ -89,14 +89,14 @@ func Imax(a uint32, b uint32) uint32 {
 	return a
 }
 
-func Streamer(f string, cache *ififo.IFifo) RelatableChannel {
+func Streamer(f string, pool *sync.Pool) RelatableChannel {
 	var stream chan Relatable
 	if strings.HasSuffix(f, ".bam") {
 		stream = BamToRelatable(f)
 	} else if strings.HasSuffix(f, ".gff") {
 		stream = GFFToRelatable(f)
 	} else {
-		stream = ScanToRelatable(f, IntervalFromBedLine, cache)
+		stream = ScanToRelatable(f, IntervalFromBedLine, pool)
 	}
 	return stream
 }

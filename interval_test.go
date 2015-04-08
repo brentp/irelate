@@ -2,7 +2,7 @@ package irelate
 
 import (
 	"fmt"
-	"github.com/brentp/ififo"
+	"sync"
 	"testing"
 )
 
@@ -39,7 +39,7 @@ func TestIntervalSource(t *testing.T) {
 
 func TestIntervalLine(t *testing.T) {
 	s := []byte("chr1\t1235\t4567\tasdf")
-	stack := ififo.NewIFifo(100, func() interface{} { return &Interval{} })
+	stack := &sync.Pool{New: func() interface{} { return &Interval{} }}
 	i := IntervalFromBedLine(s, stack)
 	if i.Start() != uint32(1235) {
 		t.Error("expected start of 1235")

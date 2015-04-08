@@ -2,8 +2,8 @@ package irelate
 
 import (
 	"bytes"
-	"github.com/brentp/ififo"
 	"strconv"
+	"sync"
 	"unsafe"
 )
 
@@ -54,7 +54,7 @@ func unsafeString(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
 
-func IntervalFromBedLine(line []byte, cache *ififo.IFifo) Relatable {
+func IntervalFromBedLine(line []byte, pool *sync.Pool) Relatable {
 	fields := bytes.SplitN(line, []byte("\t"), 4)
 	start, err := strconv.ParseUint(unsafeString(fields[1]), 10, 32)
 	if err != nil {
@@ -65,7 +65,7 @@ func IntervalFromBedLine(line []byte, cache *ififo.IFifo) Relatable {
 		panic(err)
 	}
 
-	i := cache.Get().(*Interval)
+	i := pool.Get().(*Interval)
 	i.chrom = string(fields[0])
 	i.start = uint32(start)
 	i.end = uint32(end)

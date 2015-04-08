@@ -3,7 +3,7 @@ package irelate
 
 import (
 	"container/heap"
-	"github.com/brentp/ififo"
+	"sync"
 )
 
 // Relatable provides all the methods for irelate to function.
@@ -91,6 +91,17 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 	}
 }
 
+func Recycle(p *sync.Pool, a Relatable) {
+	for _, r := range a.Related() {
+		if r.End() < a.Start() {
+			r.Clear()
+			p.Put(r)
+		}
+	}
+	a.Clear()
+	p.Put(a)
+}
+
 // IRelate provides the basis for flexible overlap/proximity/k-nearest neighbor
 // testing. IRelate receives merged, ordered Relatables via stream and takes
 // function that checks if they are related (see CheckRelatedByOverlap).
@@ -102,8 +113,7 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 func IRelate(stream RelatableChannel,
 	checkRelated func(a Relatable, b Relatable) bool,
 	includeSameSourceRelations bool,
-	relativeTo int,
-	reuse *ififo.IFifo) chan Relatable {
+	relativeTo int) chan Relatable {
 
 	out := make(chan Relatable, 64)
 	go func() {
@@ -132,7 +142,7 @@ func IRelate(stream RelatableChannel,
 						// TODO: this could be a problem if we send iv back for re-use
 						// but the caller is still using it.
 						c.Clear()
-						reuse.Put(c)
+						//reuse.Put(c)
 					}
 					cache[i] = nil
 					nils++

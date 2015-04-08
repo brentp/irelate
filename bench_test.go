@@ -1,7 +1,7 @@
 package irelate
 
 import (
-	"github.com/brentp/ififo"
+	"sync"
 	"testing"
 )
 
@@ -10,7 +10,7 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		streams := make([]RelatableChannel, 0)
 		f := "data/test.bed.gz"
-		s := ififo.NewIFifo(3000, func() interface{} { return &Interval{} })
+		s := &sync.Pool{New: func() interface{} { return &Interval{} }}
 
 		for i := 0; i < nStreams; i++ {
 			streams = append(streams, Streamer(f, s))
@@ -18,8 +18,8 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 
 		merged := Merge(streams...)
 
-		for interval := range IRelate(merged, CheckRelatedByOverlap, false, 0, s) {
-			s.Put(interval)
+		for interval := range IRelate(merged, CheckRelatedByOverlap, false, 0) {
+			Recycle(s, interval)
 		}
 
 	}
