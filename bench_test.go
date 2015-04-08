@@ -18,8 +18,8 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 
 		merged := Merge(streams...)
 
-		for interval := range IRelate(merged, CheckRelatedByOverlap, false, 0, s) {
-			s.Put(interval)
+		for interval := range IRelate(merged, CheckRelatedByOverlap, false, 0) {
+			Recycle(s, interval)
 		}
 
 	}
