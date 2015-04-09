@@ -114,10 +114,12 @@ func IRelate(stream RelatableChannel,
 		sendQ := make(relatableQueue, 0, 256)
 		nils := 0
 
+		// TODO:if we know the ends are sorted (in addition to start) then we have some additional
+		// optimizations. As soon as checkRelated is false, then all others in the cache before that
+		// should be true... binary search if endSorted and len(cache) > 20?
+		//endSorted := true
 		for interval := range stream {
 
-			// TODO: reverse cache so that removing the last element (most common case)
-			// is simply a matter of setting len(cache) = len(cache) - 1
 			for i, c := range cache {
 				// tried using futures for checkRelated to parallelize... got slower
 				if checkRelated(c, interval) {
