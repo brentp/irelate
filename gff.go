@@ -5,7 +5,7 @@ package irelate
 import (
 	"io"
 
-	"code.google.com/p/biogo/io/featio/gff"
+	"github.com/biogo/biogo/io/featio/gff"
 )
 
 type Gff struct {

@@ -3,7 +3,7 @@
 package irelate
 
 import (
-	boom "code.google.com/p/biogo.boom"
+	boom "github.com/biogo/boom"
 	"io"
 )
 
