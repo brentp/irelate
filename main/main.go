@@ -20,7 +20,7 @@ func init() {
 	go func() {
 		//for range done {
 		// for travis
-		for _ := range done {
+		for _ = range done {
 			os.Exit(0)
 		}
 	}()
