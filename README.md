@@ -19,12 +19,11 @@ is an attempt to provide an API so that users can write their own tools with lit
 Design
 ------
 
-+ Separate (sorted) data-sources are merged into a single stream (but each interval knows it's original source)
 + data-sources must support the *Relatable* Interface.
 + a user-defined function returns true if 2 *Relatable*'s are related. (only a small number of interval-pairs
-  are sent to be tested--this is handled automatically by *irelate*.).
-+ i.Related() gives access to all of the related intervals (after they are added internally by *irelated*)
-+ the API is a for loop
+  are sent to be tested--this is handled automatically by `IRelate`.).
++ i.Related() gives access to all of the related intervals (after they are added internally by `IRelate`)
++ the "API" is a for loop
 
 Example
 -------
@@ -44,21 +43,21 @@ func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
 // a and b are channels that send Relatables.
 a := ScanToRelatable('intervals.bed', IntervalFromBedLine)
 b := BamToRelatable('some.bam')
-merged := Merge(a, b)
-for interval := range IRelate(merged, CheckRelatedByOverlap, false, 0) {
+for interval := range IRelate(CheckRelatedByOverlap, false, 0, a, b) {
     fmt.Fprintf("%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 }
 ```
 
-The 3rd argument to *IRelate* determines if intervals from the same source (file) should be
-related (almost always false). The 4th argument determines the *query* set of intervals. So,
+The 2nd argument to *IRelate* determines if intervals from the same source (file) should be
+related (almost always false). The 3rd argument determines the *query* set of intervals. So,
 only intervals from `a` (the 0th) source will be sent from IRelate. If this is set to -1, then
-all intervals from all sources will be sent.
+all intervals from all sources will be sent. After this, any number of interval streams
+can be passed to `IRelate`
 
 If we only want to count alignments with a given mapping quality, the loop becomes:
 
 ```go
-for interval := range IRelate(merged, CheckRelatedByOverlap, false, 0) {
+for interval := range IRelate(CheckRelatedByOverlap, false, 0, a, b) {
     n := 0
     for _, b := range interval.Related() {
          // cast to a bam to ge the mapping quality.
@@ -82,7 +81,7 @@ CheckRelatedByOverlap) and a for loop, it is easy to create custom applications.
 For example, here is the function to relate all intervals within 2KB:
 ```go
 // CheckRelatedBy2KB returns true if intervals are within 2KB.
-func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
+func CheckRelatedBy2KB(a Relatable, b Relatable) bool {
         distance := uint32(2000)
         // note with distance == 0 this just overlap.
         return (b.Start()-distance < a.End()) && (b.Chrom() == a.Chrom())

@@ -42,9 +42,10 @@ func relate(a Relatable, b Relatable, includeSameSourceRelations bool, relativeT
 
 // CheckRelatedByOverlap returns true if Relatables overlap.
 func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
-	distance := uint32(0)
+	return (b.Start() < a.End()) && (b.Chrom() == a.Chrom())
 	// note with distance == 0 this just overlap.
-	return (b.Start()-distance < a.End()) && (b.Chrom() == a.Chrom())
+	//distance := uint32(0)
+	//return (b.Start()-distance < a.End()) && (b.Chrom() == a.Chrom())
 }
 
 // CheckKNN relates an interval to its k-nearest neighbors.
@@ -97,21 +98,23 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 // it is assumed that no other `b` Relatables could possibly be related to `a`
 // and so `a` is sent to the returnQ. It is likely that includeSameSourceRelations
 // will only be set to true if one is doing something like a merge.
-func IRelate(stream RelatableChannel,
-	checkRelated func(a Relatable, b Relatable) bool,
+// streams are a variable number of channels that send intervals.
+func IRelate(checkRelated func(a Relatable, b Relatable) bool,
 	includeSameSourceRelations bool,
-	relativeTo int) chan Relatable {
+	relativeTo int,
+	streams ...RelatableChannel) chan Relatable {
 
+	stream := Merge(streams...)
 	out := make(chan Relatable, 64)
 	go func() {
 
 		// use the cache to keep relatables to test against.
-		cache := make([]Relatable, 1, 256)
+		cache := make([]Relatable, 1, 1024)
 		cache[0] = <-stream
 
 		// Use sendQ to make sure we output in sorted order.
 		// We know we can print something when sendQ.minStart < cache.minStart
-		sendQ := make(relatableQueue, 0, 256)
+		sendQ := make(relatableQueue, 0, 1024)
 		nils := 0
 
 		// TODO:if we know the ends are sorted (in addition to start) then we have some additional
@@ -122,6 +125,9 @@ func IRelate(stream RelatableChannel,
 
 			for i, c := range cache {
 				// tried using futures for checkRelated to parallelize... got slower
+				if c == nil {
+					continue
+				}
 				if checkRelated(c, interval) {
 					relate(c, interval, includeSameSourceRelations, relativeTo)
 				} else {
@@ -134,12 +140,12 @@ func IRelate(stream RelatableChannel,
 			}
 
 			// only do this when we have a lot of nils as it's expensive to create a new slice.
-			if nils > 0 {
+			if nils > 1 {
 				// remove nils from the cache (must do this before sending)
 				cache, nils = filter(cache, nils), 0
 				// send the elements from cache in order.
 				// use heuristic to minimize the sending.
-				if len(sendQ) > 128 {
+				if len(sendQ) > 12 {
 					sendSortedRelatables(&sendQ, cache, out)
 				}
 			}
@@ -147,7 +153,7 @@ func IRelate(stream RelatableChannel,
 
 		}
 		for _, c := range filter(cache, nils) {
-			if relativeTo == -1 || c.Source() == uint32(relativeTo) {
+			if c.Source() == uint32(relativeTo) || relativeTo == -1 {
 				heap.Push(&sendQ, c)
 			}
 		}
@@ -179,7 +185,6 @@ func Merge(streams ...RelatableChannel) RelatableChannel {
 			interval = heap.Pop(&q).(Relatable)
 			source := interval.Source()
 			ch <- interval
-			// need the case/select stmt here to handle end of each stream
 			// pull the next interval from the same source.
 			next_interval, ok := <-streams[source]
 			if ok {

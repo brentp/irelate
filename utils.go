@@ -60,14 +60,11 @@ func ScanToRelatable(file string, fn func(line string) Relatable) RelatableChann
 	scanner, fh := OpenScanFile(file)
 	ch := make(chan Relatable, 32)
 	go func() {
-		var i Relatable
-		defer fh.Close()
 		for scanner.Scan() {
-			line := scanner.Text()
-			i = fn(line)
-			ch <- i
+			ch <- fn(scanner.Text())
 		}
 
+		fh.Close()
 		close(ch)
 	}()
 	return ch
