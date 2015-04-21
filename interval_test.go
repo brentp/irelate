@@ -2,12 +2,13 @@ package irelate
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
 func TestInterval(t *testing.T) {
 	a := Interval{chrom: "chr1", start: 1234, end: 5678,
-		line: "chr1\t1234\t5678"}
+		fields: strings.Split("chr1\t1234\t5678", "\t")}
 	if a.chrom != "chr1" {
 		t.Error("expected \"chr1\", got", a.chrom)
 	}
@@ -28,7 +29,7 @@ func TestInterval(t *testing.T) {
 func TestIntervalSource(t *testing.T) {
 	var a Relatable
 	a = &Interval{chrom: "chr1", start: 1234, end: 5678,
-		line: "chr1\t1234\t5678"}
+		fields: strings.Split("chr1\t1234\t5678", "\t")}
 	a.SetSource(222)
 
 	if a.Source() != 222 {

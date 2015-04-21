@@ -3,15 +3,16 @@ package irelate
 import (
 	"container/heap"
 	"fmt"
+	"strings"
 	"testing"
 )
 
 func Example() {
 	var a, b Relatable
 	a = &Interval{chrom: "chr1", start: 1234, end: 5678,
-		line: "chr1\t1234\t5678", source: 1}
+		fields: strings.Split("chr1\t1234\t5678", "\t"), source: 1}
 	b = &Interval{chrom: "chr1", start: 9234, end: 9678,
-		line: "chr1\t9234\t9678", source: 0}
+		fields: strings.Split("chr1\t9234\t9678", "\t"), source: 0}
 	fmt.Printf("%s\t%d\t%d\n", a.Chrom(), a.Start(), a.End())
 	fmt.Printf("%s\t%d\t%d\n", b.Chrom(), b.Start(), b.End())
 	fmt.Println(CheckRelatedByOverlap(a, b))
@@ -38,9 +39,9 @@ func Example() {
 func TestRelate(t *testing.T) {
 	var a, b Relatable
 	a = &Interval{chrom: "chr1", start: 1234, end: 5678,
-		line: "chr1\t1234\t5678", source: 1}
+		fields: strings.Split("chr1\t1234\t5678", "\t"), source: 1}
 	b = &Interval{chrom: "chr1", start: 9234, end: 9678,
-		line: "chr1\t9234\t9678", source: 0}
+		fields: strings.Split("chr1\t9234\t9678", "\t"), source: 0}
 
 	if len(a.Related()) != 0 {
 		t.Error("a.related should be empty")
@@ -89,12 +90,9 @@ func TestRelate(t *testing.T) {
 }
 
 func TestQ(t *testing.T) {
-	a := &Interval{chrom: "chr1", start: 1234, end: 5678,
-		line: "chr1\t1234\t5678"}
-	b := &Interval{chrom: "chr1", start: 9234, end: 9678,
-		line: "chr1\t9234\t9678"}
-	c := &Interval{chrom: "chr2", start: 9234, end: 9678,
-		line: "chr1\t9234\t9678"}
+	a := &Interval{chrom: "chr1", start: 1234, end: 5678}
+	b := &Interval{chrom: "chr1", start: 9234, end: 9678}
+	c := &Interval{chrom: "chr2", start: 9234, end: 9678}
 
 	q := make(relatableQueue, 0)
 	heap.Init(&q)
@@ -121,12 +119,9 @@ func TestQ(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	var a, b, c Relatable
-	a = &Interval{chrom: "chr1", start: 1234, end: 5678,
-		line: "chr1\t1234\t5678"}
-	b = &Interval{chrom: "chr1", start: 9234, end: 9678,
-		line: "chr1\t9234\t9678"}
-	c = &Interval{chrom: "chr2", start: 9234, end: 9678,
-		line: "chr2\t9234\t9678"}
+	a = &Interval{chrom: "chr1", start: 1234, end: 5678}
+	b = &Interval{chrom: "chr1", start: 9234, end: 9678}
+	c = &Interval{chrom: "chr2", start: 9234, end: 9678}
 
 	nexta := func() RelatableChannel {
 		ch := make(chan Relatable, 2)

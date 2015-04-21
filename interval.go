@@ -13,7 +13,7 @@ type Interval struct {
 	chrom   string
 	start   uint32
 	end     uint32
-	line    string
+	fields  []string
 	source  uint32
 	related []Relatable
 }
@@ -42,7 +42,7 @@ func (i *Interval) Less(other Relatable) bool {
 }
 
 func IntervalFromBedLine(line string) Relatable {
-	fields := strings.SplitN(line, "\t", 4)
+	fields := strings.Split(line, "\t")
 	start, err := strconv.ParseUint(fields[1], 10, 32)
 	if err != nil {
 		panic(err)
@@ -52,6 +52,6 @@ func IntervalFromBedLine(line string) Relatable {
 		panic(err)
 	}
 
-	i := Interval{chrom: fields[0], start: uint32(start), end: uint32(end), related: nil}
+	i := Interval{chrom: fields[0], start: uint32(start), end: uint32(end), related: nil, fields: fields}
 	return &i
 }
