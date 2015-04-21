@@ -13,7 +13,7 @@ type Interval struct {
 	chrom   string
 	start   uint32
 	end     uint32
-	fields  []string
+	Fields  []string
 	source  uint32
 	related []Relatable
 }
@@ -52,6 +52,6 @@ func IntervalFromBedLine(line string) Relatable {
 		panic(err)
 	}
 
-	i := Interval{chrom: fields[0], start: uint32(start), end: uint32(end), related: nil, fields: fields}
+	i := Interval{chrom: fields[0], start: uint32(start), end: uint32(end), related: nil, Fields: fields}
 	return &i
 }
