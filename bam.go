@@ -3,19 +3,21 @@
 package irelate
 
 import (
-	boom "github.com/biogo/boom"
+	"github.com/biogo/hts/bam"
+	"github.com/biogo/hts/sam"
 	"io"
+	"os"
 )
 
 type Bam struct {
-	*boom.Record
+	*sam.Record
 	source  uint32
 	related []Relatable
-	chrom   *string
+	chrom   string
 }
 
 func (a *Bam) Chrom() string {
-	return *(a.chrom)
+	return a.chrom
 }
 
 // cast to 32 bits.
@@ -55,7 +57,13 @@ func (a *Bam) Less(other Relatable) bool {
 }
 
 func (a *Bam) MapQ() int {
-	return int(a.Score())
+	return int(a.Record.MapQ)
+}
+
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
 
 func BamToRelatable(file string) RelatableChannel {
@@ -63,14 +71,14 @@ func BamToRelatable(file string) RelatableChannel {
 	ch := make(chan Relatable, 16)
 
 	go func() {
-		b, err := boom.OpenBAM(file)
+		f, err := os.Open(file)
+		check(err)
+		b, err := bam.NewReader(f, 0)
 		if err != nil {
 			panic(err)
 		}
-		defer b.Close()
-		names := b.RefNames()
 		for {
-			rec, _, err := b.Read()
+			rec, err := b.Read()
 			if err != nil {
 				if err == io.EOF {
 					break
@@ -81,11 +89,13 @@ func BamToRelatable(file string) RelatableChannel {
 			if rec.RefID() == -1 { // unmapped
 				continue
 			}
-			bam := Bam{Record: rec, chrom: &(names[rec.RefID()]),
-				related: nil}
+			// TODO: see if keeping the list of chrom names and using a ref is better.
+			bam := Bam{Record: rec, chrom: rec.Ref.Name(), related: nil}
 			ch <- &bam
 		}
 		close(ch)
+		b.Close()
+		f.Close()
 	}()
 	return ch
 }
