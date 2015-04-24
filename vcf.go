@@ -3,94 +3,67 @@ package irelate
 import (
 	"bufio"
 	"compress/gzip"
-	"github.com/mendelics/vcf"
+	"github.com/brentp/vcfgo"
 	"io"
 	"log"
 	"os"
 	"strings"
 )
 
-type Vcf struct {
-	*vcf.Variant
-	related []Relatable
+type Variant struct {
+	*vcfgo.Variant
 	source  uint32
+	related []Relatable
 }
 
-func (v *Vcf) Source() uint32 {
-	return v.source
-}
-func (v *Vcf) SetSource(src uint32) {
-	v.source = src
+func (v *Variant) AddRelated(r Relatable) {
+	v.related = append(v.related, r)
 }
 
-func (v *Vcf) Start() uint32 {
-	return uint32(v.Pos - 1)
-}
-
-// TODO: check this
-func (v *Vcf) End() uint32 {
-	return uint32(v.Pos + len(v.Alt) - len(v.Ref))
-}
-
-func (v *Vcf) Chrom() string {
-	return v.Variant.Chrom
-}
-
-func (v *Vcf) AddRelated(o Relatable) {
-	v.related = append(v.related, o)
-}
-
-func (v *Vcf) Related() []Relatable {
+func (v *Variant) Related() []Relatable {
 	return v.related
 }
 
-func (v *Vcf) Less(o Relatable) bool {
+func (v *Variant) SetSource(src uint32) { v.source = src }
+func (v *Variant) Source() uint32       { return v.source }
+
+func (v *Variant) Less(o Relatable) bool {
 	if v.Chrom() != o.Chrom() {
 		return v.Chrom() < o.Chrom()
 	}
 	return v.Start() < o.Start()
 }
 
-func VCFToRelatable(file string) RelatableChannel {
-
-	ch := make(chan Relatable, 16)
-
-	och := make(chan *vcf.Variant, 5)
-	ech := make(chan vcf.InvalidLine, 2)
-	var f io.ReadCloser
-	var err error
-
-	if file == "-" {
-		f = os.Stdin
-	} else {
-		f, err = os.Open(file)
-		if err != nil {
-			panic(err)
-		}
-		if strings.HasSuffix(file, ".gz") {
-			f, err = gzip.NewReader(f)
-			if err != nil {
-				panic(err)
-			}
-		}
+func Vopen(f string) *vcfgo.Reader {
+	var rdr io.Reader
+	rdr, err := os.Open(f)
+	if err != nil {
+		panic(err)
 	}
+	if strings.HasSuffix(f, ".gz") {
+		rdr, err = gzip.NewReader(rdr)
+	}
+	if err != nil {
+		panic(err)
+	}
+	rdr = bufio.NewReader(rdr)
+	vcf, err := vcfgo.NewReader(rdr, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return vcf
+}
 
+func StreamVCF(vcf *vcfgo.Reader) RelatableChannel {
+	ch := make(RelatableChannel, 256)
 	go func() {
-		defer f.Close()
-		r := bufio.NewReader(f)
-		err = vcf.ToChannel(r, och, ech)
-		if err != nil {
-			panic(err)
-		}
-		go func() {
-			for invalid := range ech {
-				log.Println("failed to parse", invalid.Line)
+		for {
+			v := vcf.Read()
+			if v == nil {
+				break
 			}
-			close(ech)
-		}()
-		for o := range och {
-			v := Vcf{Variant: o, related: make([]Relatable, 0, 5)}
-			ch <- &v
+			ch <- &Variant{v, 0, make([]Relatable, 0, 40)}
+			vcf.Clear()
 		}
 		close(ch)
 	}()

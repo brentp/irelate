@@ -54,6 +54,10 @@ func (a *Bam) Less(other Relatable) bool {
 	return a.Start() < other.Start()
 }
 
+func (a *Bam) MapQ() int {
+	return int(a.Score())
+}
+
 func BamToRelatable(file string) RelatableChannel {
 
 	ch := make(chan Relatable, 16)
