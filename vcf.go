@@ -1,13 +1,9 @@
 package irelate
 
 import (
-	"bufio"
-	"compress/gzip"
 	"github.com/brentp/vcfgo"
-	"io"
+	"github.com/brentp/xopen"
 	"log"
-	"os"
-	"strings"
 )
 
 type Variant struct {
@@ -35,18 +31,10 @@ func (v *Variant) Less(o Relatable) bool {
 }
 
 func Vopen(f string) *vcfgo.Reader {
-	var rdr io.Reader
-	rdr, err := os.Open(f)
+	rdr, err := xopen.Ropen(f)
 	if err != nil {
 		panic(err)
 	}
-	if strings.HasSuffix(f, ".gz") {
-		rdr, err = gzip.NewReader(rdr)
-	}
-	if err != nil {
-		panic(err)
-	}
-	rdr = bufio.NewReader(rdr)
 	vcf, err := vcfgo.NewReader(rdr, true)
 	if err != nil {
 		log.Fatal(err)
