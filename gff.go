@@ -39,10 +39,6 @@ func (g *Gff) Source() uint32 {
 	return g._source
 }
 
-func (g *Gff) Less(other Relatable) bool {
-	return Less(g, other)
-}
-
 func GFFToRelatable(file string) RelatableChannel {
 
 	ch := make(chan Relatable, 16)

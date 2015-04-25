@@ -49,10 +49,6 @@ func (a *Bam) Related() []Relatable {
 	return a.related
 }
 
-func (a *Bam) Less(other Relatable) bool {
-	return Less(a, other)
-}
-
 func (a *Bam) MapQ() int {
 	return int(a.Record.MapQ)
 }

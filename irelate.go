@@ -18,7 +18,6 @@ type Relatable interface {
 	AddRelated(Relatable) // Adds to the slice of relatables
 	Source() uint32       // Internally marks the source (file/stream) of the Relatable
 	SetSource(source uint32)
-	Less(other Relatable) bool // Determines order of the relatables (chrom, start)
 }
 
 // RelatableChannel
@@ -90,7 +89,7 @@ func filter(s []Relatable, nils int) []Relatable {
 // Check that we couldn't later get an item with a lower start from the current cache.
 func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Relatable) {
 	var j int
-	for j = 0; j < len(*sendQ) && (len(cache) == 0 || (*sendQ)[j].(Relatable).Less(cache[0])); j++ {
+	for j = 0; j < len(*sendQ) && (len(cache) == 0 || Less((*sendQ)[j].(Relatable), cache[0])); j++ {
 	}
 	for i := 0; i < j; i++ {
 		out <- heap.Pop(sendQ).(Relatable)
@@ -100,7 +99,7 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 // IRelate provides the basis for flexible overlap/proximity/k-nearest neighbor
 // testing. IRelate receives merged, ordered Relatables via stream and takes
 // function that checks if they are related (see CheckRelatedByOverlap).
-// It is guaranteed that !b.Less(a) is true (we can't guarantee that a.Less(b)
+// It is guaranteed that !Less(b, a) is true (we can't guarantee that Less(a, b)
 // is true since they may have the same start). Once checkRelated returns false,
 // it is assumed that no other `b` Relatables could possibly be related to `a`
 // and so `a` is sent to the returnQ. It is likely that includeSameSourceRelations

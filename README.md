@@ -110,7 +110,6 @@ type Relatable interface {
         Related() []Relatable // A slice of related Relatable's filled by IRelate
         AddRelated(Relatable) // Adds to the slice of relatables
         SetSource() uint32    // Internally marks the source (file/stream) of the Relatable
-        Less(other Relatable) bool // Determines order of the relatables (chrom, start)
 }
 ```
 

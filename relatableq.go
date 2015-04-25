@@ -1,12 +1,12 @@
 package irelate
 
 // relatableQueue implements the heap interface and is used to send Relatables
-// back the the caller in order (as deteremined by Relatable.Less()).
+// back the the caller in order (as deteremined by Less()).
 type relatableQueue []Relatable
 
 func (q relatableQueue) Len() int { return len(q) }
 func (q relatableQueue) Less(i, j int) bool {
-	return q[i].Less(q[j])
+	return Less(q[i], q[j])
 }
 func (q relatableQueue) Swap(i, j int) {
 	if i < len(q) {
