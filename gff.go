@@ -40,10 +40,7 @@ func (g *Gff) Source() uint32 {
 }
 
 func (g *Gff) Less(other Relatable) bool {
-	if g.Chrom() != other.Chrom() {
-		return g.Chrom() < other.Chrom()
-	}
-	return g.Start() < other.Start()
+	return Less(g, other)
 }
 
 func GFFToRelatable(file string) RelatableChannel {

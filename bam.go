@@ -50,10 +50,7 @@ func (a *Bam) Related() []Relatable {
 }
 
 func (a *Bam) Less(other Relatable) bool {
-	if a.Chrom() != other.Chrom() {
-		return a.Chrom() < other.Chrom()
-	}
-	return a.Start() < other.Start()
+	return Less(a, other)
 }
 
 func (a *Bam) MapQ() int {

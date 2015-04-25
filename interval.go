@@ -35,10 +35,7 @@ func (i *Interval) SetSource(src uint32) { i.source = src }
 
 // Interval.Less() determines the order of intervals
 func (i *Interval) Less(other Relatable) bool {
-	if i.Chrom() != other.Chrom() {
-		return i.Chrom() < other.Chrom()
-	}
-	return i.Start() < other.Start()
+	return Less(i, other)
 }
 
 func IntervalFromBedLine(line string) Relatable {

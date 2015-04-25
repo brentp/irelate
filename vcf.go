@@ -24,10 +24,7 @@ func (v *Variant) SetSource(src uint32) { v.source = src }
 func (v *Variant) Source() uint32       { return v.source }
 
 func (v *Variant) Less(o Relatable) bool {
-	if v.Chrom() != o.Chrom() {
-		return v.Chrom() < o.Chrom()
-	}
-	return v.Start() < o.Start()
+	return Less(v, o)
 }
 
 func Vopen(f string) *vcfgo.Reader {

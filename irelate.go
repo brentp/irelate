@@ -40,6 +40,13 @@ func relate(a Relatable, b Relatable, includeSameSourceRelations bool, relativeT
 	}
 }
 
+func Less(a Relatable, b Relatable) bool {
+	if a.Chrom() != b.Chrom() {
+		return a.Chrom() < b.Chrom()
+	}
+	return a.Start() < b.Start() // || (a.Start() == b.Start() && a.End() < b.End())
+}
+
 // CheckRelatedByOverlap returns true if Relatables overlap.
 func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
 	return (b.Start() < a.End()) && (b.Chrom() == a.Chrom())
