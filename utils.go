@@ -2,50 +2,14 @@ package irelate
 
 import (
 	"bufio"
-	"compress/gzip"
+	"github.com/brentp/xopen"
 	"io"
-	"os"
 	"strings"
 )
 
-// check if a buffered Reader is gzipped.
-func IsGzip(r *bufio.Reader) (bool, error) {
-	m, err := r.Peek(2)
-	if err != nil {
-		return false, err
-	}
-	return m[0] == 0x1f && m[1] == 0x8b, nil
-}
-
-func Xopen(file string) (io.ReadCloser, error) {
-	// TODO: clean this up to not use finalizer.
-	var fh io.ReadCloser
-	var err error
-	if file == "-" {
-		fh = os.Stdin
-		err = nil
-	} else {
-		fh, err = os.Open(file)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if strings.HasSuffix(file, ".gz") {
-		var fz io.ReadCloser
-		fz, err = gzip.NewReader(fh)
-		if err != nil {
-			fh.Close()
-			return nil, err
-		}
-		//runtime.SetFinalizer(fh, os.Close)
-		return fz, err
-	}
-	return fh, err
-}
-
 // OpenScanFile sets up a (possibly gzipped) file for line-wise reading.
 func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
-	fh, err := Xopen(file)
+	fh, err := xopen.Ropen(file)
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +27,6 @@ func ScanToRelatable(file string, fn func(line string) Relatable) RelatableChann
 		for scanner.Scan() {
 			ch <- fn(scanner.Text())
 		}
-
 		fh.Close()
 		close(ch)
 	}()

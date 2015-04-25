@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/biogo/biogo/io/featio/gff"
+	"github.com/brentp/xopen"
 )
 
 type Gff struct {
@@ -50,19 +51,17 @@ func GFFToRelatable(file string) RelatableChannel {
 	ch := make(chan Relatable, 16)
 
 	go func() {
-		fh, err := Xopen(file)
+		fh, err := xopen.Ropen(file)
 		if err != nil {
 			panic(err)
 		}
 		var g *gff.Reader
 		g = gff.NewReader(fh)
-		defer fh.Close()
 
 		for {
 			feat, err := g.Read()
 			if err != nil {
 				if err == io.EOF {
-					close(ch)
 					break
 				} else {
 					panic(err)
@@ -74,6 +73,8 @@ func GFFToRelatable(file string) RelatableChannel {
 			f := Gff{Feature: gfeat, related: make([]Relatable, 0, 7)}
 			ch <- &f
 		}
+		fh.Close()
+		close(ch)
 	}()
 	return ch
 }
