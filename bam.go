@@ -14,6 +14,7 @@ type Bam struct {
 	source  uint32
 	related []Relatable
 	chrom   string
+	_end    uint32
 }
 
 func (a *Bam) Chrom() string {
@@ -26,7 +27,11 @@ func (a *Bam) Start() uint32 {
 }
 
 func (a *Bam) End() uint32 {
-	return uint32(a.Record.End())
+	if a._end != 0 {
+		return a._end
+	}
+	a._end = uint32(a.Record.End())
+	return a._end
 }
 
 func (a *Bam) Source() uint32 {
