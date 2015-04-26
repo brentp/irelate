@@ -7,6 +7,51 @@ import (
 	"testing"
 )
 
+const data = `chr1_gl000191_random	50281	52281
+chr1_gl000192_random	55678	79327
+chr1_gl000192_random	55678	79327
+chr1_gl000192_random	79326	79327
+chr1_gl000192_random	79327	81327
+chr2	38813	41607
+chr2	38813	41627
+chr2	38813	46588
+chr2	41607	41627
+chr2	41627	45439
+chr2	45439	46385
+chr2	45439	46588
+chr2	46385	46588
+chr2	46587	46588
+chr2	46588	48588`
+
+func TestFunctional(t *testing.T) {
+	dats := strings.Split(data, "\n")
+	mk := func(dats []string) RelatableChannel {
+		ch := make(RelatableChannel, 4)
+		go func() {
+			for _, d := range dats {
+				i := IntervalFromBedLine(d)
+				ch <- i
+			}
+			close(ch)
+		}()
+		return ch
+	}
+	a := mk(dats)
+	b := mk(dats)
+
+	seen2 := false
+	highest := uint32(0)
+	for v := range IRelate(CheckRelatedByOverlap, false, 0, a, b) {
+		if seen2 {
+			if v.Chrom() != "chr2" || v.Start() < highest {
+				t.Error("out of order")
+			}
+			highest = v.Start()
+		}
+		seen2 = v.Chrom() == "chr2"
+	}
+}
+
 func Example() {
 	var a, b Relatable
 	a = &Interval{chrom: "chr1", start: 1234, end: 5678,
