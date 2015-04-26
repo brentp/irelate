@@ -23,10 +23,6 @@ func (v *Variant) Related() []Relatable {
 func (v *Variant) SetSource(src uint32) { v.source = src }
 func (v *Variant) Source() uint32       { return v.source }
 
-func (v *Variant) Less(o Relatable) bool {
-	return Less(v, o)
-}
-
 func Vopen(f string) *vcfgo.Reader {
 	rdr, err := xopen.Ropen(f)
 	if err != nil {
