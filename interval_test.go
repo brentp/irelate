@@ -19,7 +19,7 @@ func TestInterval(t *testing.T) {
 		t.Error("expected start = 5678, got", a.end)
 	}
 
-	s := fmt.Sprintf("%s", a)
+	s := fmt.Sprintf("%v", a)
 	if len(s) == 0 {
 		t.Error("bad String")
 	}
