@@ -28,7 +28,7 @@ Design
 Example
 -------
 
-print all the number of `b` alignments that overlap an interval in `a`
+print the number of `b` alignments that overlap an interval in `a`
 
 ```go
 
@@ -43,13 +43,12 @@ func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
 // a and b are channels that send Relatables.
 a := ScanToRelatable('intervals.bed', IntervalFromBedLine)
 b := BamToRelatable('some.bam')
-for interval := range IRelate(CheckRelatedByOverlap, false, 0, a, b) {
+for interval := range IRelate(CheckRelatedByOverlap, 0, a, b) {
     fmt.Fprintf("%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 }
 ```
 
-The 2nd argument to *IRelate* determines if intervals from the same source (file) should be
-related (almost always false). The 3rd argument determines the *query* set of intervals. So,
+The 2nd argument determines the *query* set of intervals. So,
 only intervals from `a` (the 0th) source will be sent from IRelate. If this is set to -1, then
 all intervals from all sources will be sent. After this, any number of interval streams
 can be passed to `IRelate`
@@ -57,7 +56,7 @@ can be passed to `IRelate`
 If we only want to count alignments with a given mapping quality, the loop becomes:
 
 ```go
-for interval := range IRelate(CheckRelatedByOverlap, false, 0, a, b) {
+for interval := range IRelate(CheckRelatedByOverlap, 0, a, b) {
     n := 0
     for _, b := range interval.Related() {
          // cast to a bam to ge the mapping quality.

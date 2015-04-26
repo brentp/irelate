@@ -41,7 +41,7 @@ func TestFunctional(t *testing.T) {
 
 	seen2 := false
 	highest := uint32(0)
-	for v := range IRelate(CheckRelatedByOverlap, false, 0, a, b) {
+	for v := range IRelate(CheckRelatedByOverlap, 0, a, b) {
 		if seen2 {
 			if v.Chrom() != "chr2" || v.Start() < highest {
 				t.Error("out of order")
@@ -94,7 +94,7 @@ func TestRelate(t *testing.T) {
 	if len(b.Related()) != 0 {
 		t.Error("b.related should be empty")
 	}
-	relate(a, b, false, -1)
+	relate(a, b, -1)
 	if len(a.Related()) != 1 {
 		t.Error("a.related should have 1 interval")
 	}
@@ -108,7 +108,7 @@ func TestRelate(t *testing.T) {
 	a.(*Interval).related = a.Related()[:0]
 	b.(*Interval).related = b.Related()[:0]
 
-	relate(a, b, false, int(a.Source()))
+	relate(a, b, int(a.Source()))
 	if len(b.Related()) != 0 {
 		t.Error("b shouldn't get a added")
 	}
@@ -116,7 +116,7 @@ func TestRelate(t *testing.T) {
 		t.Error("a should have b added")
 	}
 
-	relate(a, b, false, int(b.Source()))
+	relate(a, b, int(b.Source()))
 	if len(b.Related()) != 1 {
 		t.Error("b should get a added")
 	}

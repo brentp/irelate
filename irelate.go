@@ -23,8 +23,8 @@ type Relatable interface {
 // RelatableChannel
 type RelatableChannel chan Relatable
 
-func relate(a Relatable, b Relatable, includeSameSourceRelations bool, relativeTo int) {
-	if (a.Source() != b.Source()) || includeSameSourceRelations {
+func relate(a Relatable, b Relatable, relativeTo int) {
+	if a.Source() != b.Source() {
 		if relativeTo == -1 {
 			a.AddRelated(b)
 			b.AddRelated(a)
@@ -102,11 +102,9 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 // It is guaranteed that !Less(b, a) is true (we can't guarantee that Less(a, b)
 // is true since they may have the same start). Once checkRelated returns false,
 // it is assumed that no other `b` Relatables could possibly be related to `a`
-// and so `a` is sent to the returnQ. It is likely that includeSameSourceRelations
-// will only be set to true if one is doing something like a merge.
+// and so `a` is sent to the returnQ.
 // streams are a variable number of channels that send intervals.
 func IRelate(checkRelated func(a Relatable, b Relatable) bool,
-	includeSameSourceRelations bool,
 	relativeTo int,
 	streams ...RelatableChannel) chan Relatable {
 
@@ -135,7 +133,7 @@ func IRelate(checkRelated func(a Relatable, b Relatable) bool,
 					continue
 				}
 				if checkRelated(c, interval) {
-					relate(c, interval, includeSameSourceRelations, relativeTo)
+					relate(c, interval, relativeTo)
 				} else {
 					if relativeTo == -1 || c.Source() == uint32(relativeTo) {
 						heap.Push(&sendQ, c)
