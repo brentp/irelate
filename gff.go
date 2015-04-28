@@ -45,9 +45,7 @@ func GFFToRelatable(file string) RelatableChannel {
 
 	go func() {
 		fh, err := xopen.Ropen(file)
-		if err != nil {
-			panic(err)
-		}
+		check(err)
 		var g *gff.Reader
 		g = gff.NewReader(fh)
 

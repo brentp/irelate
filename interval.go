@@ -36,14 +36,9 @@ func (i *Interval) SetSource(src uint32) { i.source = src }
 func IntervalFromBedLine(line string) Relatable {
 	fields := strings.Split(line, "\t")
 	start, err := strconv.ParseUint(fields[1], 10, 32)
-	if err != nil {
-		panic(err)
-	}
+	check(err)
 	end, err := strconv.ParseUint(fields[2], 10, 32)
-	if err != nil {
-		panic(err)
-	}
-
+	check(err)
 	i := Interval{chrom: fields[0], start: uint32(start), end: uint32(end), related: nil, Fields: fields}
 	return &i
 }

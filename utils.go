@@ -10,9 +10,7 @@ import (
 // OpenScanFile sets up a (possibly gzipped) file for line-wise reading.
 func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
 	fh, err := xopen.Ropen(file)
-	if err != nil {
-		panic(err)
-	}
+	check(err)
 	scanner = bufio.NewScanner(fh)
 	scanner.Split(bufio.ScanLines)
 	return scanner, fh

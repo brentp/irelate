@@ -25,9 +25,7 @@ func (v *Variant) Source() uint32       { return v.source }
 
 func Vopen(f string) *vcfgo.Reader {
 	rdr, err := xopen.Ropen(f)
-	if err != nil {
-		panic(err)
-	}
+	check(err)
 	vcf, err := vcfgo.NewReader(rdr, true)
 	if err != nil {
 		log.Fatal(err)

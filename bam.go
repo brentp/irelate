@@ -72,9 +72,7 @@ func BamToRelatable(file string) RelatableChannel {
 		f, err := os.Open(file)
 		check(err)
 		b, err := bam.NewReader(f, 0)
-		if err != nil {
-			panic(err)
-		}
+		check(err)
 		for {
 			rec, err := b.Read()
 			if err != nil {

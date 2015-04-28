@@ -14,6 +14,10 @@ func TestBam(t *testing.T) {
 		}
 		i.SetSource(0)
 		i.AddRelated(i)
+		m := i.(*Bam).MapQ()
+		if !(0 <= m && m <= 60) {
+			t.Errorf("bad mapping quality: %d", m)
+		}
 	}
 	for i := range IRelate(CheckRelatedByOverlap, 0, g) {
 		if len(i.Related()) == 0 {
