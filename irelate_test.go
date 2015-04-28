@@ -41,7 +41,7 @@ func TestFunctional(t *testing.T) {
 
 	seen2 := false
 	highest := uint32(0)
-	for v := range IRelate(CheckRelatedByOverlap, 0, a, b) {
+	for v := range IRelate(CheckRelatedByOverlap, 0, Less, a, b) {
 		if seen2 {
 			if v.Chrom() != "chr2" || v.Start() < highest {
 				t.Error("out of order")
@@ -139,7 +139,7 @@ func TestQ(t *testing.T) {
 	b := &Interval{chrom: "chr1", start: 9234, end: 9678}
 	c := &Interval{chrom: "chr2", start: 9234, end: 9678}
 
-	q := make(relatableQueue, 0)
+	q := relatableQueue{rels: make([]Relatable, 0), less: Less}
 	heap.Init(&q)
 	heap.Push(&q, b)
 	heap.Push(&q, a)
@@ -200,7 +200,7 @@ func TestMerge(t *testing.T) {
 		return ch
 	}
 
-	merged := Merge(nextc(), nexta(), nextb())
+	merged := Merge(Less, nextc(), nexta(), nextb())
 
 	first := <-merged
 	if first != a {
@@ -230,10 +230,10 @@ func TestLessRelatableQueue(t *testing.T) {
 	a = &Interval{chrom: "chr1", start: 3077640, end: 3080640, source: 0}
 	b = &Interval{chrom: "chr1", start: 2985741, end: 3355185, source: 1}
 
-	q := make(relatableQueue, 0)
+	q := relatableQueue{rels: make([]Relatable, 0), less: Less}
 	heap.Push(&q, a)
 	heap.Push(&q, b)
-	if len(q) != 2 {
+	if len(q.rels) != 2 {
 		t.Error("Q should have lenght 2")
 	}
 	bb := heap.Pop(&q)
@@ -248,5 +248,29 @@ func TestOverlapCheck(t *testing.T) {
 
 	if CheckRelatedByOverlap(a, b) != true {
 		t.Error("intervals should overlap")
+	}
+}
+
+func TestSameChrom(t *testing.T) {
+	if !SameChrom("1", "chr1") {
+		t.Error("chr1 should == 1")
+	}
+	if !SameChrom("chr1", "1") {
+		t.Error("chr1 should == 1")
+	}
+	if !SameChrom("chr1", "chr1") {
+		t.Error("chr1 should == chr1")
+	}
+	if !SameChrom("1", "1") {
+		t.Error("1 should == 1")
+	}
+	if SameChrom("1", "2") {
+		t.Error("1 should not == 2")
+	}
+	if SameChrom("2", "1") {
+		t.Error("1 should not == 2")
+	}
+	if SameChrom("chr2", "chr1") {
+		t.Error("chr1 should not == chr2")
 	}
 }

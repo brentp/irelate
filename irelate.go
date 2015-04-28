@@ -3,6 +3,7 @@ package irelate
 
 import (
 	"container/heap"
+	"strings"
 )
 
 // Relatable provides all the methods for irelate to function.
@@ -46,12 +47,39 @@ func Less(a Relatable, b Relatable) bool {
 	return a.Start() < b.Start() // || (a.Start() == b.Start() && a.End() < b.End())
 }
 
+func SameChrom(a, b string) bool {
+	if a == b {
+		return true
+	}
+	if strings.HasPrefix(b, "chr") && !strings.HasPrefix(a, "chr") {
+		return b[3:] == a
+	} else if strings.HasPrefix(a, "chr") && !strings.HasPrefix(b, "chr") {
+		return a[3:] == b
+	}
+	return false
+}
+
+func LessPrefix(a Relatable, b Relatable) bool {
+	if !SameChrom(a.Chrom(), b.Chrom()) {
+		return a.Chrom() < b.Chrom()
+	}
+	return a.Start() < b.Start() // || (a.Start() == b.Start() && a.End() < b.End())
+}
+
 // CheckRelatedByOverlap returns true if Relatables overlap.
 func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
 	return (b.Start() < a.End()) && (b.Chrom() == a.Chrom())
 	// note with distance == 0 this just overlap.
 	//distance := uint32(0)
 	//return (b.Start()-distance < a.End()) && (b.Chrom() == a.Chrom())
+}
+
+// handles chromomomes like 'chr1' from one org and '1' from another.
+func CheckOverlapPrefix(a Relatable, b Relatable) bool {
+	if b.Start() < a.End() {
+		return SameChrom(a.Chrom(), b.Chrom())
+	}
+	return false
 }
 
 // CheckKNN relates an interval to its k-nearest neighbors.
@@ -87,9 +115,9 @@ func filter(s []Relatable, nils int) []Relatable {
 
 // Send the relatables to the channel in sorted order.
 // Check that we couldn't later get an item with a lower start from the current cache.
-func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Relatable) {
+func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Relatable, less func(a, b Relatable) bool) {
 	var j int
-	for j = 0; j < len(*sendQ) && (len(cache) == 0 || Less((*sendQ)[j].(Relatable), cache[0])); j++ {
+	for j = 0; j < len((*sendQ).rels) && (len(cache) == 0 || less((*sendQ).rels[j].(Relatable), cache[0])); j++ {
 	}
 	for i := 0; i < j; i++ {
 		out <- heap.Pop(sendQ).(Relatable)
@@ -104,11 +132,12 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 // it is assumed that no other `b` Relatables could possibly be related to `a`
 // and so `a` is sent to the returnQ.
 // streams are a variable number of channels that send intervals.
-func IRelate(checkRelated func(a Relatable, b Relatable) bool,
+func IRelate(checkRelated func(a, b Relatable) bool,
 	relativeTo int,
+	less func(a, b Relatable) bool,
 	streams ...RelatableChannel) chan Relatable {
 
-	stream := Merge(streams...)
+	stream := Merge(less, streams...)
 	out := make(chan Relatable, 64)
 	go func() {
 
@@ -118,7 +147,7 @@ func IRelate(checkRelated func(a Relatable, b Relatable) bool,
 
 		// Use sendQ to make sure we output in sorted order.
 		// We know we can print something when sendQ.minStart < cache.minStart
-		sendQ := make(relatableQueue, 0, 1024)
+		sendQ := relatableQueue{make([]Relatable, 0, 1024), less}
 		nils := 0
 
 		// TODO:if we know the ends are sorted (in addition to start) then we have some additional
@@ -149,8 +178,8 @@ func IRelate(checkRelated func(a Relatable, b Relatable) bool,
 				cache, nils = filter(cache, nils), 0
 				// send the elements from cache in order.
 				// use heuristic to minimize the sending.
-				if len(sendQ) > 12 {
-					sendSortedRelatables(&sendQ, cache, out)
+				if len(sendQ.rels) > 12 {
+					sendSortedRelatables(&sendQ, cache, out, less)
 				}
 			}
 			cache = append(cache, interval)
@@ -161,8 +190,8 @@ func IRelate(checkRelated func(a Relatable, b Relatable) bool,
 				heap.Push(&sendQ, c)
 			}
 		}
-		for i := 0; i < len(sendQ); i++ {
-			out <- sendQ[i]
+		for i := 0; i < len(sendQ.rels); i++ {
+			out <- sendQ.rels[i]
 		}
 		close(out)
 	}()
@@ -173,8 +202,8 @@ func IRelate(checkRelated func(a Relatable, b Relatable) bool,
 // Streams of Relatable's from different source must be merged to send
 // to IRelate.
 // This uses a priority queue and acts like python's heapq.merge.
-func Merge(streams ...RelatableChannel) RelatableChannel {
-	q := make(relatableQueue, 0, len(streams))
+func Merge(less func(a, b Relatable) bool, streams ...RelatableChannel) RelatableChannel {
+	q := relatableQueue{make([]Relatable, 0, len(streams)), less}
 	for i, stream := range streams {
 		interval := <-stream
 		if interval != nil {
@@ -185,7 +214,7 @@ func Merge(streams ...RelatableChannel) RelatableChannel {
 	ch := make(chan Relatable, 8)
 	go func() {
 		var interval Relatable
-		for len(q) > 0 {
+		for len(q.rels) > 0 {
 			interval = heap.Pop(&q).(Relatable)
 			source := interval.Source()
 			ch <- interval

@@ -7,7 +7,7 @@ import (
 func TestBam(t *testing.T) {
 	var g RelatableChannel
 	g = BamToRelatable("data/ex.bam")
-	for i := range IRelate(CheckRelatedByOverlap, 0, g) {
+	for i := range IRelate(CheckRelatedByOverlap, 0, Less, g) {
 		if len(i.Related()) != 0 {
 			t.Errorf("should not have another relation: %d", len(i.Related()))
 
@@ -19,7 +19,7 @@ func TestBam(t *testing.T) {
 			t.Errorf("bad mapping quality: %d", m)
 		}
 	}
-	for i := range IRelate(CheckRelatedByOverlap, 0, g) {
+	for i := range IRelate(CheckOverlapPrefix, 0, LessPrefix, g) {
 		if len(i.Related()) == 0 {
 			t.Errorf("should have another relation: %d", len(i.Related()))
 

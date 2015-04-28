@@ -14,7 +14,8 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 			streams = append(streams, Streamer(f))
 		}
 
-		for a := range IRelate(CheckRelatedByOverlap, 0, streams...) {
+		//for a := range IRelate(CheckOverlapPrefix, 0, LessPrefix, streams...) {
+		for a := range IRelate(CheckRelatedByOverlap, 0, Less, streams...) {
 			a.Start()
 		}
 

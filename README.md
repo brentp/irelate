@@ -39,12 +39,20 @@ func CheckRelatedByOverlap(a Relatable, b Relatable) bool {
         return (b.Start() < a.End()) && (b.Chrom() == a.Chrom())
 }
 
+// determine ordering of Relatables.
+func Less(a Relatable, b Relatable) bool {
+    if a.Chrom() != b.Chrom() {
+        return a.Chrom() < b.Chrom()
+    }
+    return a.Start() < b.Start() // || (a.Start() == b.Start() && a.End() < b.End())
+}
+
 
 
 // a and b are channels that send Relatables.
 a := ScanToRelatable('intervals.bed', IntervalFromBedLine)
 b := BamToRelatable('some.bam')
-for interval := range IRelate(CheckRelatedByOverlap, 0, a, b) {
+for interval := range IRelate(CheckRelatedByOverlap, 0, Less, a, b) {
     fmt.Fprintf("%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 }
 ```
@@ -57,7 +65,7 @@ can be passed to `IRelate`
 If we only want to count alignments with a given mapping quality, the loop becomes:
 
 ```go
-for interval := range IRelate(CheckRelatedByOverlap, 0, a, b) {
+for interval := range IRelate(CheckRelatedByOverlap, 0, Less, a, b) {
     n := 0
     for _, b := range interval.Related() {
          // cast to a bam to ge the mapping quality.
