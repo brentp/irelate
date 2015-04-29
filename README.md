@@ -20,14 +20,18 @@ is an attempt to provide an API so that users can write their own tools with lit
 Design
 ------
 
-+ data-sources must support the *Relatable* Interface.
++ data-sources must support the *Relatable* Interface. (we provide parsers for common formats).
 + a user-defined function returns true if 2 *Relatable*'s are related. (only a small number of interval-pairs
-  are sent to be tested--this is handled automatically by `IRelate`.).
+  are sent to be tested--this is handled automatically by `IRelate`.). We provide `CheckRelatedByOverlap`
+  to perform overlap testing.
 + i.Related() gives access to all of the related intervals (after they are added internally by `IRelate`)
 + the "API" is a for loop
 
 Example
 -------
+
+(also see [main/main.go](https://github.com/brentp/irelate/blob/master/main/main.go) which
+is similar to bedtools intersect -sorted -sortout -c)
 
 print the number of `b` alignments that overlap an interval in `a`
 
