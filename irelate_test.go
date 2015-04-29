@@ -273,4 +273,10 @@ func TestSameChrom(t *testing.T) {
 	if SameChrom("chr2", "chr1") {
 		t.Error("chr1 should not == chr2")
 	}
+	if SameChrom("1", "11") {
+		t.Error("11 should not == 1")
+	}
+	if SameChrom("11", "1") {
+		t.Error("11 should not == 1")
+	}
 }

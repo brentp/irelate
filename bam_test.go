@@ -26,3 +26,15 @@ func TestBam(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteBam(t *testing.T) {
+	b1 := BamToRelatable("https://github.com/brentp/irelate/raw/master/data/ex.bam")
+	b2 := BamToRelatable("data/ex.bam")
+	for interval := range IRelate(CheckRelatedByOverlap, 0, Less, b1, b2) {
+		if len(interval.Related()) == 0 {
+			t.Errorf("should not have other relation: %s", interval)
+
+		}
+		break
+	}
+}
