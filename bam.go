@@ -3,10 +3,11 @@
 package irelate
 
 import (
+	"io"
+
 	"github.com/biogo/hts/bam"
 	"github.com/biogo/hts/sam"
-	"io"
-	"os"
+	"github.com/brentp/xopen"
 )
 
 type Bam struct {
@@ -69,7 +70,7 @@ func BamToRelatable(file string) RelatableChannel {
 	ch := make(chan Relatable, 16)
 
 	go func() {
-		f, err := os.Open(file)
+		f, err := xopen.XReader(file)
 		check(err)
 		b, err := bam.NewReader(f, 0)
 		check(err)
@@ -91,7 +92,7 @@ func BamToRelatable(file string) RelatableChannel {
 		}
 		close(ch)
 		b.Close()
-		f.Close()
+		f.(io.ReadCloser).Close()
 	}()
 	return ch
 }
