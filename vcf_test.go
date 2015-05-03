@@ -2,6 +2,8 @@ package irelate
 
 import (
 	"testing"
+
+	"github.com/brentp/vcfgo"
 )
 
 func TestVCF(t *testing.T) {
@@ -16,6 +18,32 @@ func TestVCF(t *testing.T) {
 
 		}
 		i.SetSource(0)
+	}
+
+}
+
+var v1 = &vcfgo.Variant{
+	Chromosome: "chr1",
+	Pos:        uint64(234),
+	Id:         "id",
+	Ref:        "A",
+	Alt:        []string{"T", "G"},
+	Quality:    float32(555.5),
+	Filter:     "PASS",
+	Info: map[string]interface{}{
+		"DP":      uint32(35),
+		"__order": []string{"DP"},
+	},
+}
+
+func TestNewVariant(t *testing.T) {
+
+	iv := NewVariant(v1, uint32(1), []Relatable{})
+	if len(iv.Related()) != 0 {
+		t.Errorf("shouldn't have any relateds")
+	}
+	if iv.Source() != uint32(1) {
+		t.Errorf("shouldn't have source of 1")
 	}
 
 }

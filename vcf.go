@@ -13,6 +13,10 @@ type Variant struct {
 	related []Relatable
 }
 
+func NewVariant(v *vcfgo.Variant, source uint32, related []Relatable) *Variant {
+	return &Variant{v, source, related}
+}
+
 func (v *Variant) AddRelated(r Relatable) {
 	v.related = append(v.related, r)
 }
