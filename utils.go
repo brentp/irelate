@@ -2,9 +2,10 @@ package irelate
 
 import (
 	"bufio"
-	"github.com/brentp/xopen"
 	"io"
 	"strings"
+
+	"github.com/brentp/xopen"
 )
 
 // OpenScanFile sets up a (possibly gzipped) file for line-wise reading.
@@ -51,6 +52,9 @@ func Streamer(f string) RelatableChannel {
 		stream = BamToRelatable(f)
 	} else if strings.HasSuffix(f, ".gff") {
 		stream = GFFToRelatable(f)
+	} else if strings.HasSuffix(f, ".vcf") || strings.HasSuffix(f, ".vcf.gz") {
+		v := Vopen(f)
+		stream = StreamVCF(v)
 	} else {
 		stream = ScanToRelatable(f, IntervalFromBedLine)
 	}

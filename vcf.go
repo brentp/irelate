@@ -1,9 +1,10 @@
 package irelate
 
 import (
+	"log"
+
 	"github.com/brentp/vcfgo"
 	"github.com/brentp/xopen"
-	"log"
 )
 
 type Variant struct {
