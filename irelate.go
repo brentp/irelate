@@ -51,19 +51,21 @@ func SameChrom(a, b string) bool {
 	if a == b {
 		return true
 	}
-	if strings.HasPrefix(b, "chr") && !strings.HasPrefix(a, "chr") {
-		return b[3:] == a
-	} else if strings.HasPrefix(a, "chr") && !strings.HasPrefix(b, "chr") {
-		return a[3:] == b
+	return stripChr(a) == stripChr(b)
+}
+
+func stripChr(c string) string {
+	if strings.HasPrefix(c, "chr") {
+		return c[3:]
 	}
-	return false
+	return c
 }
 
 func LessPrefix(a Relatable, b Relatable) bool {
 	if !SameChrom(a.Chrom(), b.Chrom()) {
-		return a.Chrom() < b.Chrom()
+		return stripChr(a.Chrom()) < stripChr(b.Chrom())
 	}
-	return a.Start() < b.Start() // || (a.Start() == b.Start() && a.End() < b.End())
+	return a.Start() < b.Start() //|| (a.Start() == b.Start() && a.End() < b.End())
 }
 
 // CheckRelatedByOverlap returns true if Relatables overlap.

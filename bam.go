@@ -67,7 +67,7 @@ func check(err error) {
 
 func BamToRelatable(file string) RelatableChannel {
 
-	ch := make(chan Relatable, 16)
+	ch := make(chan Relatable, 64)
 
 	go func() {
 		f, err := xopen.XReader(file)

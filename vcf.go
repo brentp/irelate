@@ -39,14 +39,14 @@ func Vopen(f string) *vcfgo.Reader {
 }
 
 func StreamVCF(vcf *vcfgo.Reader) RelatableChannel {
-	ch := make(RelatableChannel, 256)
+	ch := make(RelatableChannel, 128)
 	go func() {
 		for {
 			v := vcf.Read()
 			if v == nil {
 				break
 			}
-			ch <- &Variant{v, 0, make([]Relatable, 0, 40)}
+			ch <- &Variant{v, 0, make([]Relatable, 0, 16)}
 			vcf.Clear()
 		}
 		close(ch)
