@@ -12,14 +12,14 @@ import (
 
 type Bam struct {
 	*sam.Record
-	source  uint32
-	related []Relatable
-	chrom   string
-	_end    uint32
+	source     uint32
+	related    []Relatable
+	Chromosome string
+	_end       uint32
 }
 
 func (a *Bam) Chrom() string {
-	return a.chrom
+	return a.Chromosome
 }
 
 // cast to 32 bits.
@@ -87,7 +87,7 @@ func BamToRelatable(file string) RelatableChannel {
 				continue
 			}
 			// TODO: see if keeping the list of chrom names and using a ref is better.
-			bam := Bam{Record: rec, chrom: rec.Ref.Name(), related: nil}
+			bam := Bam{Record: rec, Chromosome: rec.Ref.Name(), related: nil}
 			ch <- &bam
 		}
 		close(ch)
