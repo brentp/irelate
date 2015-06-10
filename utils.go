@@ -15,7 +15,6 @@ func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
 	scanner = bufio.NewScanner(fh)
 	scanner.Split(bufio.ScanLines)
 	return scanner, fh
-
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.

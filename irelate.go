@@ -3,7 +3,11 @@ package irelate
 
 import (
 	"container/heap"
+	"log"
+	"os"
 	"strings"
+
+	"vbom.ml/util/sortorder"
 )
 
 // Relatable provides all the methods for irelate to function.
@@ -61,11 +65,21 @@ func stripChr(c string) string {
 	return c
 }
 
+// 1, 2, 3 ... 9, 10, 11...
+func NaturalLessPrefix(a Relatable, b Relatable) bool {
+	if !SameChrom(a.Chrom(), b.Chrom()) {
+		return sortorder.NaturalLess(stripChr(a.Chrom()), stripChr(b.Chrom()))
+	}
+	return a.Start() < b.Start() || (a.Start() == b.Start() && a.End() < b.End())
+
+}
+
+// 1, 10, 11... 19, 2, 20, 21 ...
 func LessPrefix(a Relatable, b Relatable) bool {
 	if !SameChrom(a.Chrom(), b.Chrom()) {
 		return stripChr(a.Chrom()) < stripChr(b.Chrom())
 	}
-	return a.Start() < b.Start() //|| (a.Start() == b.Start() && a.End() < b.End())
+	return a.Start() < b.Start() || (a.Start() == b.Start() && a.End() < b.End())
 }
 
 // CheckRelatedByOverlap returns true if Relatables overlap.
@@ -139,6 +153,7 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 	less func(a, b Relatable) bool,
 	streams ...RelatableChannel) chan Relatable {
 
+	// we infer the chromosome order by the order that we see from source 0.
 	stream := Merge(less, streams...)
 	out := make(chan Relatable, 64)
 	go func() {
@@ -205,7 +220,9 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 // to IRelate.
 // This uses a priority queue and acts like python's heapq.merge.
 func Merge(less func(a, b Relatable) bool, streams ...RelatableChannel) RelatableChannel {
+	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
 	q := relatableQueue{make([]Relatable, 0, len(streams)), less}
+	seen := make(map[string]struct{})
 	for i, stream := range streams {
 		interval := <-stream
 		if interval != nil {
@@ -213,13 +230,27 @@ func Merge(less func(a, b Relatable) bool, streams ...RelatableChannel) Relatabl
 			heap.Push(&q, interval)
 		}
 	}
+
 	ch := make(chan Relatable, 8)
 	go func() {
 		var interval Relatable
+		sentinel := struct{}{}
+		lastChrom := ""
 		for len(q.rels) > 0 {
 			interval = heap.Pop(&q).(Relatable)
 			source := interval.Source()
 			ch <- interval
+			if interval.Chrom() != lastChrom {
+				lastChrom = interval.Chrom()
+				if _, ok := seen[lastChrom]; ok {
+					log.Println("warning: chromosomes must be in different order between files or the chromosome sort order is not as expected.")
+					log.Println("warning: overlaps will likely be missed after this point.")
+				}
+				seen[lastChrom] = sentinel
+				if verbose {
+					log.Printf("on chromosome: %s\n", lastChrom)
+				}
+			}
 			// pull the next interval from the same source.
 			next_interval, ok := <-streams[source]
 			if ok {
