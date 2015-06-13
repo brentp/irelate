@@ -244,7 +244,7 @@ func Merge(less func(a, b Relatable) bool, streams ...RelatableChannel) Relatabl
 				lastChrom = interval.Chrom()
 				if _, ok := seen[lastChrom]; ok {
 					log.Println("warning: chromosomes must be in different order between files or the chromosome sort order is not as expected.")
-					log.Println("warning: overlaps will likely be missed after this point.")
+					log.Printf("warning: overlaps will likely be missed after this chrom: %s from source: %d\n", lastChrom, interval.Source())
 				}
 				seen[lastChrom] = sentinel
 				if verbose {
