@@ -33,6 +33,10 @@ func (i *Interval) AddRelated(b Relatable) {
 func (i *Interval) Source() uint32       { return i.source }
 func (i *Interval) SetSource(src uint32) { i.source = src }
 
+func (i *Interval) String() string {
+	return strings.Join(i.Fields, "\t")
+}
+
 func IntervalFromBedLine(line string) Relatable {
 	fields := strings.Split(line, "\t")
 	start, err := strconv.ParseUint(fields[1], 10, 32)
