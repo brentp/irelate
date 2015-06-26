@@ -154,7 +154,7 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 	streams ...RelatableChannel) chan Relatable {
 
 	// we infer the chromosome order by the order that we see from source 0.
-	stream := Merge(less, streams...)
+	stream := Merge(less, relativeTo, streams...)
 	out := make(chan Relatable, 64)
 	go func() {
 
@@ -219,7 +219,7 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 // Streams of Relatable's from different source must be merged to send
 // to IRelate.
 // This uses a priority queue and acts like python's heapq.merge.
-func Merge(less func(a, b Relatable) bool, streams ...RelatableChannel) RelatableChannel {
+func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableChannel) RelatableChannel {
 	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
 	q := relatableQueue{make([]Relatable, 0, len(streams)), less}
 	seen := make(map[string]struct{})
@@ -236,6 +236,8 @@ func Merge(less func(a, b Relatable) bool, streams ...RelatableChannel) Relatabl
 		var interval Relatable
 		sentinel := struct{}{}
 		lastChrom := ""
+		// heuristic to use this to stop when end of query records is reached.
+		j := -1000
 		for len(q.rels) > 0 {
 			interval = heap.Pop(&q).(Relatable)
 			source := interval.Source()
@@ -256,6 +258,16 @@ func Merge(less func(a, b Relatable) bool, streams ...RelatableChannel) Relatabl
 			if ok {
 				next_interval.SetSource(source)
 				heap.Push(&q, next_interval)
+				j--
+				if j == 0 {
+					break
+				}
+			} else {
+				if int(source) == relativeTo {
+					// we pull in 200K more records and then stop. to make sure we get anything that might
+					// relate to last query
+					j = 200000
+				}
 			}
 		}
 		close(ch)

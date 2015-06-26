@@ -30,10 +30,7 @@ var v1 = &vcfgo.Variant{
 	Alt:        []string{"T", "G"},
 	Quality:    float32(555.5),
 	Filter:     "PASS",
-	Info: map[string]interface{}{
-		"DP":      uint32(35),
-		"__order": []string{"DP"},
-	},
+	Info:       vcfgo.NewInfoByte("DP=35", nil),
 }
 
 func TestNewVariant(t *testing.T) {

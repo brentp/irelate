@@ -200,7 +200,7 @@ func TestMerge(t *testing.T) {
 		return ch
 	}
 
-	merged := Merge(Less, nextc(), nexta(), nextb())
+	merged := Merge(Less, 0, nextc(), nexta(), nextb())
 
 	first := <-merged
 	if first != a {
