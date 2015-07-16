@@ -3,6 +3,7 @@ package irelate
 
 import (
 	"container/heap"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -256,6 +257,11 @@ func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableC
 			// pull the next interval from the same source.
 			next_interval, ok := <-streams[source]
 			if ok {
+				if next_interval.Start() < interval.Start() {
+					if SameChrom(next_interval.Chrom(), interval.Chrom()) {
+						panic(fmt.Sprintf("intervals out of order within file: starts at: %d and %d from source: %d", interval.Start(), next_interval.Start(), source))
+					}
+				}
 				next_interval.SetSource(source)
 				heap.Push(&q, next_interval)
 				j--
