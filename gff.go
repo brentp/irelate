@@ -4,6 +4,7 @@ package irelate
 
 import (
 	"io"
+	"log"
 
 	"github.com/biogo/biogo/io/featio/gff"
 	"github.com/brentp/xopen"
@@ -39,13 +40,15 @@ func (g *Gff) Source() uint32 {
 	return g._source
 }
 
-func GFFToRelatable(file string) RelatableChannel {
+func GFFToRelatable(file string) (RelatableChannel, error) {
 
 	ch := make(chan Relatable, 16)
+	fh, err := xopen.Ropen(file)
+	if err != nil {
+		return nil, err
+	}
 
 	go func() {
-		fh, err := xopen.Ropen(file)
-		check(err)
 		var g *gff.Reader
 		g = gff.NewReader(fh)
 
@@ -55,7 +58,8 @@ func GFFToRelatable(file string) RelatableChannel {
 				if err == io.EOF {
 					break
 				} else {
-					panic(err)
+					log.Println(err)
+					break
 				}
 			}
 			// since Read returns the interface, first cast back
@@ -67,5 +71,5 @@ func GFFToRelatable(file string) RelatableChannel {
 		fh.Close()
 		close(ch)
 	}()
-	return ch
+	return ch, nil
 }

@@ -54,8 +54,8 @@ func Less(a Relatable, b Relatable) bool {
 
 
 // a and b are channels that send Relatables.
-a := ScanToRelatable('intervals.bed', IntervalFromBedLine)
-b := BamToRelatable('some.bam')
+a, _ := ScanToRelatable('intervals.bed', IntervalFromBedLine)
+b, _ := BamToRelatable('some.bam')
 for interval := range IRelate(CheckRelatedByOverlap, 0, Less, a, b) {
     fmt.Fprintf("%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 }

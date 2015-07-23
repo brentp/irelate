@@ -29,7 +29,7 @@ func TestFunctional(t *testing.T) {
 		ch := make(RelatableChannel, 4)
 		go func() {
 			for _, d := range dats {
-				i := IntervalFromBedLine(d)
+				i, _ := IntervalFromBedLine(d)
 				ch <- i
 			}
 			close(ch)

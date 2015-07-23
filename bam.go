@@ -4,6 +4,7 @@ package irelate
 
 import (
 	"io"
+	"log"
 
 	"github.com/biogo/hts/bam"
 	"github.com/biogo/hts/sam"
@@ -65,22 +66,27 @@ func check(err error) {
 	}
 }
 
-func BamToRelatable(file string) RelatableChannel {
+func BamToRelatable(file string) (RelatableChannel, error) {
 
 	ch := make(chan Relatable, 64)
+	f, err := xopen.XReader(file)
+	if err != nil {
+		return nil, err
+	}
+	b, err := bam.NewReader(f, 0)
+	if err != nil {
+		return nil, err
+	}
 
 	go func() {
-		f, err := xopen.XReader(file)
-		check(err)
-		b, err := bam.NewReader(f, 0)
-		check(err)
 		for {
 			rec, err := b.Read()
 			if err != nil {
 				if err == io.EOF {
 					break
 				} else {
-					panic(err)
+					log.Println(err)
+					break
 				}
 			}
 			if rec.RefID() == -1 { // unmapped
@@ -94,5 +100,5 @@ func BamToRelatable(file string) RelatableChannel {
 		b.Close()
 		f.(io.ReadCloser).Close()
 	}()
-	return ch
+	return ch, nil
 }

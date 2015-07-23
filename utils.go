@@ -3,6 +3,7 @@ package irelate
 import (
 	"bufio"
 	"io"
+	"log"
 	"strings"
 
 	"github.com/brentp/xopen"
@@ -18,12 +19,17 @@ func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.
-func ScanToRelatable(file string, fn func(line string) Relatable) RelatableChannel {
+func ScanToRelatable(file string, fn func(line string) (Relatable, error)) RelatableChannel {
 	scanner, fh := OpenScanFile(file)
 	ch := make(chan Relatable, 32)
 	go func() {
 		for scanner.Scan() {
-			ch <- fn(scanner.Text())
+			v, err := fn(scanner.Text())
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			ch <- v
 		}
 		fh.Close()
 		close(ch)
@@ -45,17 +51,18 @@ func Imax(a uint32, b uint32) uint32 {
 	return a
 }
 
-func Streamer(f string) RelatableChannel {
+func Streamer(f string) (RelatableChannel, error) {
 	var stream chan Relatable
+	var err error
 	if strings.HasSuffix(f, ".bam") {
-		stream = BamToRelatable(f)
+		stream, err = BamToRelatable(f)
 	} else if strings.HasSuffix(f, ".gff") {
-		stream = GFFToRelatable(f)
+		stream, err = GFFToRelatable(f)
 	} else if strings.HasSuffix(f, ".vcf") || strings.HasSuffix(f, ".vcf.gz") {
 		v := Vopen(f)
 		stream = StreamVCF(v)
 	} else {
 		stream = ScanToRelatable(f, IntervalFromBedLine)
 	}
-	return stream
+	return stream, err
 }

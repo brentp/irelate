@@ -11,9 +11,17 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 		f := "data/test.bed.gz"
 
 		for i := 0; i < nStreams; i++ {
-			streams = append(streams, Streamer(f))
+			s, e := Streamer(f)
+			if e != nil {
+				panic(e)
+			}
+			streams = append(streams, s)
 		}
-		streams = append(streams, Streamer("data/ex.bam"))
+		b, e := Streamer("data/ex.bam")
+		if e != nil {
+			panic(e)
+		}
+		streams = append(streams, b)
 
 		//for a := range IRelate(CheckRelatedByOverlap, 0, Less, streams...) {
 		for a := range IRelate(CheckOverlapPrefix, 0, LessPrefix, streams...) {

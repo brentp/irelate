@@ -33,7 +33,10 @@ func TestImax(t *testing.T) {
 
 func TestStreamer(t *testing.T) {
 	for _, f := range []string{"data/a.bed", "data/ex.gff", "data/ex.bam"} {
-		s := Streamer(f)
+		s, e := Streamer(f)
+		if e != nil {
+			t.Errorf("got error: %s\n", e)
+		}
 		for r := range s {
 			_ = r.Start()
 		}

@@ -6,7 +6,7 @@ import (
 
 func TestBam(t *testing.T) {
 	var g RelatableChannel
-	g = BamToRelatable("data/ex.bam")
+	g, _ = BamToRelatable("data/ex.bam")
 	for i := range IRelate(CheckRelatedByOverlap, 0, Less, g) {
 		if len(i.Related()) != 0 {
 			t.Errorf("should not have another relation: %d", len(i.Related()))
@@ -28,8 +28,8 @@ func TestBam(t *testing.T) {
 }
 
 func TestRemoteBam(t *testing.T) {
-	b1 := BamToRelatable("https://github.com/brentp/irelate/raw/master/data/ex.bam")
-	b2 := BamToRelatable("data/ex.bam")
+	b1, _ := BamToRelatable("https://github.com/brentp/irelate/raw/master/data/ex.bam")
+	b2, _ := BamToRelatable("data/ex.bam")
 	for interval := range IRelate(CheckRelatedByOverlap, 0, Less, b1, b2) {
 		if len(interval.Related()) == 0 {
 			t.Errorf("should not have other relation: %s", interval)
