@@ -116,16 +116,18 @@ func CheckKNN(a Relatable, b Relatable) bool {
 
 // filter rewrites the input-slice to remove nils.
 func filter(s []Relatable, nils int) []Relatable {
-	if len(s) == nils {
-		return s[:0]
-	}
-
 	j := 0
-	for _, v := range s {
-		if v != nil {
-			s[j] = v
-			j++
+	if len(s) != nils {
+
+		for _, v := range s {
+			if v != nil {
+				s[j] = v
+				j++
+			}
 		}
+	}
+	for k := j; k < len(s); k++ {
+		s[k] = nil
 	}
 	return s[:j]
 }
@@ -196,7 +198,7 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 				cache, nils = filter(cache, nils), 0
 				// send the elements from cache in order.
 				// use heuristic to minimize the sending.
-				if len(sendQ.rels) > 12 {
+				if len(sendQ.rels) > 8 {
 					sendSortedRelatables(&sendQ, cache, out, less)
 				}
 			}

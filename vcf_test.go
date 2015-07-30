@@ -22,7 +22,7 @@ func TestVCF(t *testing.T) {
 
 }
 
-var v1 = &vcfgo.Variant{
+var v1 = vcfgo.Variant{
 	Chromosome: "chr1",
 	Pos:        uint64(234),
 	Id:         "id",

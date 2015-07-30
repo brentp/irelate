@@ -8,12 +8,12 @@ import (
 )
 
 type Variant struct {
-	*vcfgo.Variant
+	vcfgo.Variant
 	source  uint32
 	related []Relatable
 }
 
-func NewVariant(v *vcfgo.Variant, source uint32, related []Relatable) *Variant {
+func NewVariant(v vcfgo.Variant, source uint32, related []Relatable) *Variant {
 	return &Variant{v, source, related}
 }
 
@@ -46,7 +46,7 @@ func StreamVCF(vcf *vcfgo.Reader) RelatableChannel {
 			if v == nil {
 				break
 			}
-			ch <- &Variant{v, 0, make([]Relatable, 0, 16)}
+			ch <- &Variant{*v, 0, make([]Relatable, 0, 16)}
 			vcf.Clear()
 		}
 		close(ch)

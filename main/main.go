@@ -35,7 +35,8 @@ func main() {
 	streams := make([]I.RelatableChannel, 0)
 	for _, f := range files {
 		// Streamer automatically returns a Relatalbe Channel for bam/gff/bed(.gz)
-		streams = append(streams, I.Streamer(f))
+		s, _ := I.Streamer(f)
+		streams = append(streams, s)
 	}
 
 	if *cpuProfile {
