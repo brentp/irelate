@@ -44,13 +44,18 @@ func Vopen(f string) *vcfgo.Reader {
 func StreamVCF(vcf *vcfgo.Reader) RelatableChannel {
 	ch := make(RelatableChannel, 256)
 	go func() {
+		j := 0
 		for {
 			v := vcf.Read()
 			if v == nil {
 				break
 			}
 			ch <- &Variant{*v, 0, nil}
-			vcf.Clear()
+			j++
+			if j < 1000 {
+				vcf.Clear()
+				j = 0
+			}
 		}
 		close(ch)
 	}()
