@@ -42,7 +42,7 @@ func Vopen(f string) *vcfgo.Reader {
 }
 
 func StreamVCF(vcf *vcfgo.Reader) RelatableChannel {
-	ch := make(RelatableChannel, 128)
+	ch := make(RelatableChannel, 256)
 	go func() {
 		for {
 			v := vcf.Read()
