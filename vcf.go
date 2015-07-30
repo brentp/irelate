@@ -18,6 +18,9 @@ func NewVariant(v vcfgo.Variant, source uint32, related []Relatable) *Variant {
 }
 
 func (v *Variant) AddRelated(r Relatable) {
+	if len(v.related) == 0 {
+		v.related = make([]Relatable, 0, 12)
+	}
 	v.related = append(v.related, r)
 }
 
@@ -46,7 +49,7 @@ func StreamVCF(vcf *vcfgo.Reader) RelatableChannel {
 			if v == nil {
 				break
 			}
-			ch <- &Variant{*v, 0, make([]Relatable, 0, 16)}
+			ch <- &Variant{*v, 0, nil}
 			vcf.Clear()
 		}
 		close(ch)
