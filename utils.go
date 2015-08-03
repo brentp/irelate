@@ -23,13 +23,18 @@ func ScanToRelatable(file string, fn func(line string) (Relatable, error)) Relat
 	scanner, fh := OpenScanFile(file)
 	ch := make(chan Relatable, 32)
 	go func() {
+		i := 0
 		for scanner.Scan() {
 			v, err := fn(scanner.Text())
 			if err != nil {
-				log.Println(err)
-				break
+				if i > 0 { // break on the header.
+					log.Println(err)
+					break
+				}
+			} else {
+				ch <- v
+				i += 1
 			}
-			ch <- v
 		}
 		fh.Close()
 		close(ch)
