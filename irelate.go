@@ -16,14 +16,62 @@ import (
 // Related() likely returns and AddRelated() likely appends to a slice of
 // relatables. Note that for performance reasons, Relatable should be implemented
 // as a pointer to your data-structure (see Interval).
-type Relatable interface {
+
+type IPosition interface {
 	Chrom() string
 	Start() uint32
 	End() uint32
+}
+
+type Relatable interface {
+	IPosition
 	Related() []Relatable // A slice of related Relatable's filled by IRelate
 	AddRelated(Relatable) // Adds to the slice of relatables
 	Source() uint32       // Internally marks the source (file/stream) of the Relatable
 	SetSource(source uint32)
+}
+
+type IVariant interface {
+	IPosition
+	Ref() string
+	Alt() []string
+}
+
+func SamePosition(a, b IPosition) bool {
+	return a.Start() == b.Start() && a.End() == b.End() && a.Chrom() == b.Chrom()
+}
+
+func SameVariant(a, b IVariant) bool {
+	if a.Start() != b.Start() || a.End() != b.End() || a.Chrom() != b.Chrom() || a.Ref() != b.Ref() {
+		return false
+	}
+	for _, aalt := range a.Alt() {
+		for _, balt := range b.Alt() {
+			if aalt == balt {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func Same(a, b IPosition, strict bool) bool {
+	if av, ok := a.(IVariant); ok {
+		if bv, ok := b.(IVariant); ok {
+			return SameVariant(av, bv)
+		}
+		if strict {
+			return false
+		}
+		return SamePosition(a, b)
+	}
+	if _, ok := b.(IVariant); ok {
+		if strict {
+			return false
+		}
+		return SamePosition(a, b)
+	}
+	return SamePosition(a, b)
 }
 
 // RelatableChannel
