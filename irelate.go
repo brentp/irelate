@@ -38,11 +38,15 @@ type IVariant interface {
 }
 
 func SamePosition(a, b IPosition) bool {
-	return a.Start() == b.Start() && a.End() == b.End() && a.Chrom() == b.Chrom()
+	return a.Start() == b.Start() && a.End() == b.End() && SameChrom(a.Chrom(), b.Chrom())
+}
+
+func OverlapsPosition(a, b IPosition) bool {
+	return (b.Start() < a.End() && b.End() >= a.Start()) && SameChrom(a.Chrom(), b.Chrom())
 }
 
 func SameVariant(a, b IVariant) bool {
-	if a.Start() != b.Start() || a.End() != b.End() || a.Chrom() != b.Chrom() || a.Ref() != b.Ref() {
+	if !SamePosition(a, b) || a.Ref() != b.Ref() {
 		return false
 	}
 	for _, aalt := range a.Alt() {
@@ -56,22 +60,15 @@ func SameVariant(a, b IVariant) bool {
 }
 
 func Same(a, b IPosition, strict bool) bool {
+	// strict only applies if both are IVariants, otherwise, we just check for overlap.
 	if av, ok := a.(IVariant); ok {
 		if bv, ok := b.(IVariant); ok {
-			return SameVariant(av, bv)
+			return (strict && SameVariant(av, bv)) || OverlapsPosition(a, b)
 		}
-		if strict {
-			return false
-		}
-		return SamePosition(a, b)
+		return OverlapsPosition(a, b)
 	}
-	if _, ok := b.(IVariant); ok {
-		if strict {
-			return false
-		}
-		return SamePosition(a, b)
-	}
-	return SamePosition(a, b)
+	// at most one of them is a variant, just check overlap.
+	return OverlapsPosition(a, b)
 }
 
 // RelatableChannel
