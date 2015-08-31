@@ -3,28 +3,29 @@ package irelate
 import (
 	"log"
 
+	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/vcfgo"
 	"github.com/brentp/xopen"
 )
 
 type Variant struct {
-	vcfgo.Variant
+	interfaces.IVariant
 	source  uint32
-	related []Relatable
+	related []interfaces.Relatable
 }
 
-func NewVariant(v vcfgo.Variant, source uint32, related []Relatable) *Variant {
+func NewVariant(v interfaces.IVariant, source uint32, related []interfaces.Relatable) *Variant {
 	return &Variant{v, source, related}
 }
 
-func (v *Variant) AddRelated(r Relatable) {
+func (v *Variant) AddRelated(r interfaces.Relatable) {
 	if len(v.related) == 0 {
-		v.related = make([]Relatable, 0, 12)
+		v.related = make([]interfaces.Relatable, 0, 12)
 	}
 	v.related = append(v.related, r)
 }
 
-func (v *Variant) Related() []Relatable {
+func (v *Variant) Related() []interfaces.Relatable {
 	return v.related
 }
 
@@ -50,7 +51,7 @@ func StreamVCF(vcf *vcfgo.Reader) RelatableChannel {
 			if v == nil {
 				break
 			}
-			ch <- &Variant{*v, 0, nil}
+			ch <- &Variant{v, 0, nil}
 			j++
 			if j < 1000 {
 				vcf.Clear()

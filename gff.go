@@ -7,13 +7,14 @@ import (
 	"log"
 
 	"github.com/biogo/biogo/io/featio/gff"
+	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/xopen"
 )
 
 type Gff struct {
 	*gff.Feature
 	_source uint32
-	related []Relatable
+	related []interfaces.Relatable
 }
 
 func (g *Gff) Chrom() string {
@@ -26,10 +27,10 @@ func (g *Gff) Start() uint32 {
 func (g *Gff) End() uint32 {
 	return uint32(g.Feature.End())
 }
-func (g *Gff) Related() []Relatable {
+func (g *Gff) Related() []interfaces.Relatable {
 	return g.related
 }
-func (g *Gff) AddRelated(r Relatable) {
+func (g *Gff) AddRelated(r interfaces.Relatable) {
 	g.related = append(g.related, r)
 }
 
@@ -42,7 +43,7 @@ func (g *Gff) Source() uint32 {
 
 func GFFToRelatable(file string) (RelatableChannel, error) {
 
-	ch := make(chan Relatable, 16)
+	ch := make(chan interfaces.Relatable, 16)
 	fh, err := xopen.Ropen(file)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func GFFToRelatable(file string) (RelatableChannel, error) {
 			// since Read returns the interface, first cast back
 			// to gff.Feature so we have the needed Attributes.
 			gfeat := feat.(*gff.Feature)
-			f := Gff{Feature: gfeat, related: make([]Relatable, 0, 7)}
+			f := Gff{Feature: gfeat, related: make([]interfaces.Relatable, 0, 7)}
 			ch <- &f
 		}
 		fh.Close()

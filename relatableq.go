@@ -1,10 +1,12 @@
 package irelate
 
+import "github.com/brentp/irelate/interfaces"
+
 // relatableQueue implements the heap interface and is used to send Relatables
 // back the the caller in order (as deteremined by Less()).
 type relatableQueue struct {
-	rels []Relatable
-	less func(a, b Relatable) bool
+	rels []interfaces.Relatable
+	less func(a, b interfaces.Relatable) bool
 }
 
 func (q relatableQueue) Len() int { return len(q.rels) }
@@ -17,7 +19,7 @@ func (q relatableQueue) Swap(i, j int) {
 	}
 }
 func (q *relatableQueue) Push(i interface{}) {
-	iv := i.(Relatable)
+	iv := i.(interfaces.Relatable)
 	(*q).rels = append((*q).rels, iv)
 }
 

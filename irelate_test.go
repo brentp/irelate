@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	. "github.com/brentp/irelate/interfaces"
 )
 
 const data = `chr1_gl000191_random	50281	52281

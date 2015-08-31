@@ -3,6 +3,7 @@ package irelate
 import (
 	"testing"
 
+	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/vcfgo"
 )
 
@@ -35,7 +36,7 @@ var v1 = vcfgo.Variant{
 
 func TestNewVariant(t *testing.T) {
 
-	iv := NewVariant(v1, uint32(1), []Relatable{})
+	iv := NewVariant(&v1, uint32(1), []interfaces.Relatable{})
 	if len(iv.Related()) != 0 {
 		t.Errorf("shouldn't have any relateds")
 	}

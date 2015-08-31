@@ -8,13 +8,14 @@ import (
 
 	"github.com/biogo/hts/bam"
 	"github.com/biogo/hts/sam"
+	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/xopen"
 )
 
 type Bam struct {
 	*sam.Record
 	source     uint32
-	related    []Relatable
+	related    []interfaces.Relatable
 	Chromosome string
 	_end       uint32
 }
@@ -44,15 +45,15 @@ func (a *Bam) SetSource(src uint32) {
 	a.source = src
 }
 
-func (a *Bam) AddRelated(b Relatable) {
+func (a *Bam) AddRelated(b interfaces.Relatable) {
 	if a.related == nil {
-		a.related = make([]Relatable, 1, 2)
+		a.related = make([]interfaces.Relatable, 1, 2)
 		a.related[0] = b
 	} else {
 		a.related = append(a.related, b)
 	}
 }
-func (a *Bam) Related() []Relatable {
+func (a *Bam) Related() []interfaces.Relatable {
 	return a.related
 }
 
@@ -68,7 +69,7 @@ func check(err error) {
 
 func BamToRelatable(file string) (RelatableChannel, error) {
 
-	ch := make(chan Relatable, 64)
+	ch := make(chan interfaces.Relatable, 64)
 	f, err := xopen.XReader(file)
 	if err != nil {
 		return nil, err

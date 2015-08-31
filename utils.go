@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/xopen"
 )
 
@@ -19,9 +20,9 @@ func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.
-func ScanToRelatable(file string, fn func(line string) (Relatable, error)) RelatableChannel {
+func ScanToRelatable(file string, fn func(line string) (interfaces.Relatable, error)) RelatableChannel {
 	scanner, fh := OpenScanFile(file)
-	ch := make(chan Relatable, 32)
+	ch := make(chan interfaces.Relatable, 32)
 	go func() {
 		i := 0
 		for scanner.Scan() {
@@ -57,7 +58,7 @@ func Imax(a uint32, b uint32) uint32 {
 }
 
 func Streamer(f string) (RelatableChannel, error) {
-	var stream chan Relatable
+	var stream chan interfaces.Relatable
 	var err error
 	if strings.HasSuffix(f, ".bam") {
 		stream, err = BamToRelatable(f)

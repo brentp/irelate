@@ -3,6 +3,8 @@ package irelate
 import (
 	"strconv"
 	"strings"
+
+	"github.com/brentp/irelate/interfaces"
 )
 
 const empty = ""
@@ -15,16 +17,16 @@ type Interval struct {
 	end     uint32
 	Fields  []string
 	source  uint32
-	related []Relatable
+	related []interfaces.Relatable
 }
 
-func (i *Interval) Chrom() string        { return i.chrom }
-func (i *Interval) Start() uint32        { return i.start }
-func (i *Interval) End() uint32          { return i.end }
-func (i *Interval) Related() []Relatable { return i.related }
-func (i *Interval) AddRelated(b Relatable) {
+func (i *Interval) Chrom() string                   { return i.chrom }
+func (i *Interval) Start() uint32                   { return i.start }
+func (i *Interval) End() uint32                     { return i.end }
+func (i *Interval) Related() []interfaces.Relatable { return i.related }
+func (i *Interval) AddRelated(b interfaces.Relatable) {
 	if i.related == nil {
-		i.related = make([]Relatable, 1, 4)
+		i.related = make([]interfaces.Relatable, 1, 4)
 		i.related[0] = b
 	} else {
 		i.related = append(i.related, b)
@@ -37,7 +39,7 @@ func (i *Interval) String() string {
 	return strings.Join(i.Fields, "\t")
 }
 
-func IntervalFromBedLine(line string) (Relatable, error) {
+func IntervalFromBedLine(line string) (interfaces.Relatable, error) {
 	fields := strings.Split(line, "\t")
 	start, err := strconv.ParseUint(fields[1], 10, 32)
 	if err != nil {

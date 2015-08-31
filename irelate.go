@@ -6,70 +6,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
+
+	. "github.com/brentp/irelate/interfaces"
 
 	"vbom.ml/util/sortorder"
 )
-
-// Relatable provides all the methods for irelate to function.
-// See Interval in interval.go for a class that satisfies this interface.
-// Related() likely returns and AddRelated() likely appends to a slice of
-// relatables. Note that for performance reasons, Relatable should be implemented
-// as a pointer to your data-structure (see Interval).
-
-type IPosition interface {
-	Chrom() string
-	Start() uint32
-	End() uint32
-}
-
-type Relatable interface {
-	IPosition
-	Related() []Relatable // A slice of related Relatable's filled by IRelate
-	AddRelated(Relatable) // Adds to the slice of relatables
-	Source() uint32       // Internally marks the source (file/stream) of the Relatable
-	SetSource(source uint32)
-}
-
-type IVariant interface {
-	IPosition
-	Ref() string
-	Alt() []string
-}
-
-func SamePosition(a, b IPosition) bool {
-	return a.Start() == b.Start() && a.End() == b.End() && SameChrom(a.Chrom(), b.Chrom())
-}
-
-func OverlapsPosition(a, b IPosition) bool {
-	return (b.Start() < a.End() && b.End() >= a.Start()) && SameChrom(a.Chrom(), b.Chrom())
-}
-
-func SameVariant(a, b IVariant) bool {
-	if !SamePosition(a, b) || a.Ref() != b.Ref() {
-		return false
-	}
-	for _, aalt := range a.Alt() {
-		for _, balt := range b.Alt() {
-			if aalt == balt {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func Same(a, b IPosition, strict bool) bool {
-	// strict only applies if both are IVariants, otherwise, we just check for overlap.
-	if av, ok := a.(IVariant); ok {
-		if bv, ok := b.(IVariant); ok {
-			return (strict && SameVariant(av, bv)) || OverlapsPosition(a, b)
-		}
-		return OverlapsPosition(a, b)
-	}
-	// at most one of them is a variant, just check overlap.
-	return OverlapsPosition(a, b)
-}
 
 // RelatableChannel
 type RelatableChannel chan Relatable
@@ -97,24 +38,10 @@ func Less(a Relatable, b Relatable) bool {
 	return a.Start() < b.Start() // || (a.Start() == b.Start() && a.End() < b.End())
 }
 
-func SameChrom(a, b string) bool {
-	if a == b {
-		return true
-	}
-	return stripChr(a) == stripChr(b)
-}
-
-func stripChr(c string) string {
-	if strings.HasPrefix(c, "chr") {
-		return c[3:]
-	}
-	return c
-}
-
 // 1, 2, 3 ... 9, 10, 11...
 func NaturalLessPrefix(a Relatable, b Relatable) bool {
 	if !SameChrom(a.Chrom(), b.Chrom()) {
-		return sortorder.NaturalLess(stripChr(a.Chrom()), stripChr(b.Chrom()))
+		return sortorder.NaturalLess(StripChr(a.Chrom()), StripChr(b.Chrom()))
 	}
 	return a.Start() < b.Start() || (a.Start() == b.Start() && a.End() < b.End())
 
@@ -123,7 +50,7 @@ func NaturalLessPrefix(a Relatable, b Relatable) bool {
 // 1, 10, 11... 19, 2, 20, 21 ...
 func LessPrefix(a Relatable, b Relatable) bool {
 	if !SameChrom(a.Chrom(), b.Chrom()) {
-		return stripChr(a.Chrom()) < stripChr(b.Chrom())
+		return StripChr(a.Chrom()) < StripChr(b.Chrom())
 	}
 	return a.Start() < b.Start() || (a.Start() == b.Start() && a.End() < b.End())
 }
@@ -291,7 +218,7 @@ func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableC
 			source := interval.Source()
 			ch <- interval
 			if SameChrom(interval.Chrom(), lastChrom) {
-				lastChrom = stripChr(interval.Chrom())
+				lastChrom = StripChr(interval.Chrom())
 				if _, ok := seen[lastChrom]; ok {
 					log.Println("warning: chromosomes must be in different order between files or the chromosome sort order is not as expected.")
 					log.Printf("warning: overlaps will likely be missed after this chrom: %s from source: %d\n", lastChrom, interval.Source())

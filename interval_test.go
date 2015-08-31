@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	. "github.com/brentp/irelate/interfaces"
 )
 
 func TestInterval(t *testing.T) {
