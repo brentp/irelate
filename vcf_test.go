@@ -31,7 +31,7 @@ var v1 = vcfgo.Variant{
 	Alternate:  []string{"T", "G"},
 	Quality:    float32(555.5),
 	Filter:     "PASS",
-	Info:       vcfgo.NewInfoByte("DP=35", nil),
+	Info_:      vcfgo.NewInfoByte("DP=35", nil),
 }
 
 func TestNewVariant(t *testing.T) {
