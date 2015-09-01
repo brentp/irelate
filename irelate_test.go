@@ -125,14 +125,6 @@ func TestRelate(t *testing.T) {
 	if len(a.Related()) != 1 {
 		t.Error("a should get b re-added")
 	}
-	bf := filter(b.Related(), 0)
-	if len(bf) != len(b.Related()) {
-		t.Error("b shouldn't have been filtered")
-	}
-	bf[0] = nil
-	if len(filter(bf, 1)) == len(b.Related()) {
-		t.Error("should have been filtered")
-	}
 
 }
 

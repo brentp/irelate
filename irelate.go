@@ -86,29 +86,11 @@ func CheckKNN(a Relatable, b Relatable) bool {
 	return true
 }
 
-// filter rewrites the input-slice to remove nils.
-func filter(s []Relatable, nils int) []Relatable {
-	j := 0
-	if len(s) != nils {
-
-		for _, v := range s {
-			if v != nil {
-				s[j] = v
-				j++
-			}
-		}
-	}
-	for k := j; k < len(s); k++ {
-		s[k] = nil
-	}
-	return s[:j]
-}
-
 // Send the relatables to the channel in sorted order.
 // Check that we couldn't later get an item with a lower start from the current cache.
-func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Relatable, less func(a, b Relatable) bool) {
+func sendSortedRelatables(sendQ *relatableQueue, minStart uint32, out chan Relatable, less func(a, b Relatable) bool) {
 	var j int
-	for j = 0; j < len((*sendQ).rels) && (len(cache) == 0 || less((*sendQ).rels[j].(Relatable), cache[0])); j++ {
+	for j = 0; j < len((*sendQ).rels) && ((*sendQ).rels[j].(Relatable).Start() < minStart); j++ {
 	}
 	for i := 0; i < j; i++ {
 		out <- heap.Pop(sendQ).(Relatable)
@@ -134,50 +116,63 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 	go func() {
 
 		// use the cache to keep relatables to test against.
-		cache := make([]Relatable, 1, 1024)
-		cache[0] = <-stream
+
+		// (lowest ends at start of q) highest ends get popped first.
+		cache := lowEndRelatableQueue{make([]Relatable, 0, 1024)}
+		v := <-stream
+		if v == nil {
+			close(out)
+			return
+		}
+		heap.Push(&cache, v)
+		lastChrom := v.Chrom()
 
 		// Use sendQ to make sure we output in sorted order.
 		// We know we can print something when sendQ.minStart < cache.minStart
 		sendQ := relatableQueue{make([]Relatable, 0, 1024), less}
-		nils := 0
+		j := 0
 
-		// TODO:if we know the ends are sorted (in addition to start) then we have some additional
-		// optimizations. As soon as checkRelated is false, then all others in the cache before that
-		// should be true... binary search if endSorted and len(cache) > 20?
-		//endSorted := true
 		for interval := range stream {
-
-			for i, c := range cache {
-				// tried using futures for checkRelated to parallelize... got slower
-				if c == nil {
-					continue
-				}
+			// cache.rels orded with highest ends last.
+			// as soon as we are related, break:
+			for j = 0; j < len(cache.rels); j++ {
+				c := cache.rels[j]
 				if checkRelated(c, interval) {
-					relate(c, interval, relativeTo)
-				} else {
-					if relativeTo == -1 || c.Source() == uint32(relativeTo) {
-						heap.Push(&sendQ, c)
+					break
+				}
+
+				if relativeTo == -1 || c.Source() == uint32(relativeTo) {
+					heap.Push(&sendQ, c)
+				}
+			}
+
+			// all these have been sent to sendQ
+			cache.rels = cache.rels[j:]
+			minStart := ^uint32(0)
+
+			if interval.Chrom() != lastChrom {
+				sendSortedRelatables(&sendQ, minStart, out, less)
+				lastChrom = interval.Chrom()
+				if len(cache.rels) > 0 {
+					log.Fatalf("shouldn't have any overlaps across chromosomes")
+				}
+				if len(sendQ.rels) > 0 {
+					log.Fatalf("sendQ should be empty across chromosomes")
+				}
+			} else {
+				for _, c := range cache.rels {
+					if c.Start() < minStart {
+						minStart = c.Start()
 					}
-					cache[i] = nil
-					nils++
+					relate(c, interval, relativeTo)
+				}
+				if len(sendQ.rels) > 5 {
+					sendSortedRelatables(&sendQ, minStart, out, less)
 				}
 			}
-
-			// only do this when we have a lot of nils as it's expensive to create a new slice.
-			if nils > 1 {
-				// remove nils from the cache (must do this before sending)
-				cache, nils = filter(cache, nils), 0
-				// send the elements from cache in order.
-				// use heuristic to minimize the sending.
-				if len(sendQ.rels) > 8 {
-					sendSortedRelatables(&sendQ, cache, out, less)
-				}
-			}
-			cache = append(cache, interval)
-
+			heap.Push(&cache, interval)
 		}
-		for _, c := range filter(cache, nils) {
+		for _, c := range cache.rels {
 			if c.Source() == uint32(relativeTo) || relativeTo == -1 {
 				heap.Push(&sendQ, c)
 			}

@@ -33,3 +33,34 @@ func (q *relatableQueue) Pop() interface{} {
 	(*q).rels = old[0 : n-1]
 	return iv
 }
+
+type lowEndRelatableQueue struct {
+	rels []interfaces.Relatable
+}
+
+func (q lowEndRelatableQueue) Len() int { return len(q.rels) }
+
+func (q lowEndRelatableQueue) Less(i, j int) bool {
+	return q.rels[i].End() < q.rels[j].End()
+}
+
+func (q lowEndRelatableQueue) Swap(i, j int) {
+	if i < len(q.rels) {
+		q.rels[j], q.rels[i] = q.rels[i], q.rels[j]
+	}
+}
+func (q *lowEndRelatableQueue) Push(i interface{}) {
+	iv := i.(interfaces.Relatable)
+	(*q).rels = append((*q).rels, iv)
+}
+
+func (q *lowEndRelatableQueue) Pop() interface{} {
+	n := len((*q).rels)
+	if n == 0 {
+		return nil
+	}
+	old := (*q).rels
+	iv := old[n-1]
+	(*q).rels = old[0 : n-1]
+	return iv
+}
