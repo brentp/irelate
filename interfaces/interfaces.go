@@ -3,10 +3,25 @@ package interfaces
 
 import "strings"
 
+// IPosition allows accessing positional interface for genomic types.
 type IPosition interface {
 	Chrom() string
 	Start() uint32
 	End() uint32
+}
+
+type RandomGetter interface {
+	Get(query IPosition) []IPosition
+}
+
+// A RandomChannel accepts a single IPosition and returns a slice of all overlapping positions.
+type RandomChannel interface {
+	Relate(chan IPosition) chan []IPosition
+}
+
+type Sourceable interface {
+	Source() uint32
+	SetSource(source uint32)
 }
 
 // Relatable provides all the methods for irelate to function.
@@ -18,10 +33,10 @@ type Relatable interface {
 	IPosition
 	Related() []Relatable // A slice of related Relatable's filled by IRelate
 	AddRelated(Relatable) // Adds to the slice of relatables
-	Source() uint32       // Internally marks the source (file/stream) of the Relatable
-	SetSource(source uint32)
+	Sourceable
 }
 
+// Info must implement stuff to get info out of a variant info field.
 type Info interface {
 	Get(key string) (interface{}, error)
 	Set(key string, val interface{}) error
@@ -30,11 +45,14 @@ type Info interface {
 	String() string
 }
 
+// IVariant must implement IPosition as well as Ref, Alt, and Inof() methods for genetic variants
 type IVariant interface {
 	IPosition
 	Ref() string
 	Alt() []string
 	Info() Info
+	Id() string
+	String() string
 }
 
 func SameChrom(a, b string) bool {
@@ -75,12 +93,14 @@ func SameVariant(a, b IVariant) bool {
 
 func Same(a, b IPosition, strict bool) bool {
 	// strict only applies if both are IVariants, otherwise, we just check for overlap.
+	if !strict {
+		return OverlapsPosition(a, b)
+	}
 	if av, ok := a.(IVariant); ok {
 		if bv, ok := b.(IVariant); ok {
 			if strict {
 				return SameVariant(av, bv)
 			}
-			return OverlapsPosition(a, b)
 		}
 		return OverlapsPosition(a, b)
 	}
