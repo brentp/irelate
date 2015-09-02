@@ -26,7 +26,7 @@ func TestVCF(t *testing.T) {
 var v1 = vcfgo.Variant{
 	Chromosome: "chr1",
 	Pos:        uint64(234),
-	Id:         "id",
+	Id_:        "id",
 	Reference:  "A",
 	Alternate:  []string{"T", "G"},
 	Quality:    float32(555.5),

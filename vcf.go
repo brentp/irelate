@@ -14,6 +14,10 @@ type Variant struct {
 	related []interfaces.Relatable
 }
 
+func (v *Variant) String() string {
+	return v.IVariant.String()
+}
+
 func NewVariant(v interfaces.IVariant, source uint32, related []interfaces.Relatable) *Variant {
 	return &Variant{v, source, related}
 }
