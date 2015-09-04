@@ -2,6 +2,7 @@ package irelate
 
 import (
 	"bufio"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/brentp/bix"
 	"github.com/brentp/irelate/interfaces"
+	"github.com/brentp/xopen"
 )
 
 // OpenScanFile sets up a (possibly gzipped) file for line-wise reading.
@@ -61,7 +63,7 @@ func Imax(a uint32, b uint32) uint32 {
 	return a
 }
 
-func regionToParts(region string) (string, int, int, error) {
+func RegionToParts(region string) (string, int, int, error) {
 	parts := strings.Split(region, ":")
 	se := strings.Split(parts[1], "-")
 	if len(se) != 2 {
@@ -89,7 +91,7 @@ func Streamer(f string, region string) (RelatableChannel, error) {
 		if err != nil {
 			return nil, err
 		}
-		chrom, start, end, err := regionToParts(region)
+		chrom, start, end, err := RegionToParts(region)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +104,15 @@ func Streamer(f string, region string) (RelatableChannel, error) {
 	}
 	var buf io.Reader
 	if !strings.HasSuffix(f, ".bam") {
-		buf = bufio.NewReaderSize(rdr, 2^17)
+		bufr := bufio.NewReaderSize(rdr, 2^17)
+		if is, err := xopen.IsGzip(bufr); is {
+			buf, err = gzip.NewReader(bufr)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			buf = bufr
+		}
 	} else {
 		buf = rdr
 	}
