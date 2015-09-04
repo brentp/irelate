@@ -104,7 +104,7 @@ func Streamer(f string, region string) (RelatableChannel, error) {
 	}
 	var buf io.Reader
 	if !strings.HasSuffix(f, ".bam") {
-		bufr := bufio.NewReaderSize(rdr, 2^17)
+		bufr := bufio.NewReader(rdr)
 		if is, err := xopen.IsGzip(bufr); is {
 			buf, err = gzip.NewReader(bufr)
 			if err != nil {
