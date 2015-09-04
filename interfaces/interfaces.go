@@ -19,11 +19,6 @@ type RandomChannel interface {
 	Relate(chan IPosition) chan []IPosition
 }
 
-type Sourceable interface {
-	Source() uint32
-	SetSource(source uint32)
-}
-
 // Relatable provides all the methods for irelate to function.
 // See Interval in interval.go for a class that satisfies this interface.
 // Related() likely returns and AddRelated() likely appends to a slice of
@@ -33,7 +28,8 @@ type Relatable interface {
 	IPosition
 	Related() []Relatable // A slice of related Relatable's filled by IRelate
 	AddRelated(Relatable) // Adds to the slice of relatables
-	Sourceable
+	Source() uint32
+	SetSource(source uint32)
 }
 
 // Info must implement stuff to get info out of a variant info field.
