@@ -95,7 +95,7 @@ func Streamer(f string, region string) (RelatableChannel, error) {
 		if err != nil {
 			return nil, err
 		}
-		rdr, err = bx.Query(chrom, start, end)
+		rdr, err = bx.Query(chrom, start, end, true)
 	} else {
 		rdr, err = os.Open(f)
 	}
