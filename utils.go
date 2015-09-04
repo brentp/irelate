@@ -2,25 +2,27 @@ package irelate
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 
+	"github.com/brentp/bix"
 	"github.com/brentp/irelate/interfaces"
-	"github.com/brentp/xopen"
 )
 
 // OpenScanFile sets up a (possibly gzipped) file for line-wise reading.
-func OpenScanFile(file string) (scanner *bufio.Scanner, fh io.ReadCloser) {
-	fh, err := xopen.Ropen(file)
-	check(err)
-	scanner = bufio.NewScanner(fh)
+func OpenScanFile(fh io.Reader) (*bufio.Scanner, io.Reader) {
+	scanner := bufio.NewScanner(fh)
 	scanner.Split(bufio.ScanLines)
 	return scanner, fh
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.
-func ScanToRelatable(file string, fn func(line string) (interfaces.Relatable, error)) RelatableChannel {
+func ScanToRelatable(file io.Reader, fn func(line string) (interfaces.Relatable, error)) RelatableChannel {
 	scanner, fh := OpenScanFile(file)
 	ch := make(chan interfaces.Relatable, 32)
 	go func() {
@@ -37,7 +39,9 @@ func ScanToRelatable(file string, fn func(line string) (interfaces.Relatable, er
 				i += 1
 			}
 		}
-		fh.Close()
+		if c, ok := fh.(io.ReadCloser); ok {
+			c.Close()
+		}
 		close(ch)
 	}()
 	return ch
@@ -57,18 +61,61 @@ func Imax(a uint32, b uint32) uint32 {
 	return a
 }
 
-func Streamer(f string) (RelatableChannel, error) {
+func regionToParts(region string) (string, int, int, error) {
+	parts := strings.Split(region, ":")
+	se := strings.Split(parts[1], "-")
+	if len(se) != 2 {
+		return "", 0, 0, errors.New(fmt.Sprintf("unable to parse region: %s", region))
+	}
+	s, err := strconv.Atoi(se[0])
+	if err != nil {
+		return "", 0, 0, errors.New(fmt.Sprintf("unable to parse region: %s", region))
+	}
+	e, err := strconv.Atoi(se[1])
+	if err != nil {
+		return "", 0, 0, errors.New(fmt.Sprintf("unable to parse region: %s", region))
+	}
+	return parts[0], s, e, nil
+}
+
+func Streamer(f string, region string) (RelatableChannel, error) {
 	var stream chan interfaces.Relatable
 	var err error
+
+	var rdr io.Reader
+	var bx *bix.Bix
+	if region != "" {
+		bx, err = bix.New(f)
+		if err != nil {
+			return nil, err
+		}
+		chrom, start, end, err := regionToParts(region)
+		if err != nil {
+			return nil, err
+		}
+		rdr, err = bx.Query(chrom, start, end)
+	} else {
+		rdr, err = os.Open(f)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var buf io.Reader
+	if !strings.HasSuffix(f, ".bam") {
+		buf = bufio.NewReaderSize(rdr, 2^17)
+	} else {
+		buf = rdr
+	}
+
 	if strings.HasSuffix(f, ".bam") {
-		stream, err = BamToRelatable(f)
+		stream, err = BamToRelatable(buf)
 	} else if strings.HasSuffix(f, ".gff") {
-		stream, err = GFFToRelatable(f)
+		stream, err = GFFToRelatable(buf)
 	} else if strings.HasSuffix(f, ".vcf") || strings.HasSuffix(f, ".vcf.gz") {
-		v := Vopen(f)
+		v := Vopen(buf)
 		stream = StreamVCF(v)
 	} else {
-		stream = ScanToRelatable(f, IntervalFromBedLine)
+		stream = ScanToRelatable(buf, IntervalFromBedLine)
 	}
 	return stream, err
 }

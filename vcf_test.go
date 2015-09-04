@@ -5,11 +5,21 @@ import (
 
 	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/vcfgo"
+	"github.com/brentp/xopen"
 )
 
 func TestVCF(t *testing.T) {
-	g1 := Vopen("https://raw.githubusercontent.com/brentp/vcfgo/master/examples/test.query.vcf")
-	g2 := Vopen("https://raw.githubusercontent.com/brentp/vcfgo/master/examples/test.query.vcf")
+	r1, err := xopen.Ropen("https://raw.githubusercontent.com/brentp/vcfgo/master/examples/test.query.vcf")
+	if err != nil {
+		t.Error("couldn't open remote file")
+	}
+	r2, err := xopen.Ropen("https://raw.githubusercontent.com/brentp/vcfgo/master/examples/test.query.vcf")
+	if err != nil {
+		t.Error("couldn't open remote file")
+	}
+
+	g1 := Vopen(r1)
+	g2 := Vopen(r2)
 
 	v1 := StreamVCF(g1)
 	v2 := StreamVCF(g2)

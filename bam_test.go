@@ -2,11 +2,13 @@ package irelate
 
 import (
 	"testing"
+
+	"github.com/brentp/xopen"
 )
 
 func TestBam(t *testing.T) {
 	var g RelatableChannel
-	g, _ = BamToRelatable("data/ex.bam")
+	g, _ = Streamer("data/ex.bam", "")
 	for i := range IRelate(CheckRelatedByOverlap, 0, Less, g) {
 		if len(i.Related()) != 0 {
 			t.Errorf("should not have another relation: %d", len(i.Related()))
@@ -28,8 +30,20 @@ func TestBam(t *testing.T) {
 }
 
 func TestRemoteBam(t *testing.T) {
-	b1, _ := BamToRelatable("https://github.com/brentp/irelate/raw/master/data/ex.bam")
-	b2, _ := BamToRelatable("data/ex.bam")
+
+	f1, err := xopen.XReader("https://github.com/brentp/irelate/raw/master/data/ex.bam")
+	if err != nil {
+		t.Errorf("couldn't open remote bam")
+	}
+
+	//f2, err := os.Open("data/ex.bam")
+	f2, err := xopen.XReader("data/ex.bam")
+	if err != nil {
+		t.Errorf("couldn't open local bam")
+	}
+
+	b1, _ := BamToRelatable(f1)
+	b2, _ := BamToRelatable(f2)
 	for interval := range IRelate(CheckRelatedByOverlap, 0, Less, b1, b2) {
 		if len(interval.Related()) == 0 {
 			t.Errorf("should not have other relation: %s", interval)

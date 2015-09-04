@@ -11,13 +11,13 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 		f := "data/test.bed.gz"
 
 		for i := 0; i < nStreams; i++ {
-			s, e := Streamer(f)
+			s, e := Streamer(f, "")
 			if e != nil {
 				panic(e)
 			}
 			streams = append(streams, s)
 		}
-		b, e := Streamer("data/ex.bam")
+		b, e := Streamer("data/ex.bam", "")
 		if e != nil {
 			panic(e)
 		}

@@ -1,11 +1,11 @@
 package irelate
 
 import (
+	"io"
 	"log"
 
 	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/vcfgo"
-	"github.com/brentp/xopen"
 )
 
 type Variant struct {
@@ -36,9 +36,7 @@ func (v *Variant) Related() []interfaces.Relatable {
 func (v *Variant) SetSource(src uint32) { v.source = src }
 func (v *Variant) Source() uint32       { return v.source }
 
-func Vopen(f string) *vcfgo.Reader {
-	rdr, err := xopen.Ropen(f)
-	check(err)
+func Vopen(rdr io.Reader) *vcfgo.Reader {
 	vcf, err := vcfgo.NewReader(rdr, true)
 	if err != nil {
 		log.Fatal(err)

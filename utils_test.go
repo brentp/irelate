@@ -1,16 +1,25 @@
 package irelate
 
 import (
+	"io"
+	"os"
 	"testing"
 )
 
 func TestOpenScanFile(t *testing.T) {
-	s, fh := OpenScanFile("utils_test.go")
+	f, e := os.Open("utils_test.go")
+	if e != nil {
+		t.Error("couldn't open file")
+	}
+
+	s, fh := OpenScanFile(f)
 
 	if !s.Scan() {
 		t.Error("should have a scanner")
 	}
-	fh.Close()
+	if f, ok := fh.(io.ReadCloser); ok {
+		f.Close()
+	}
 }
 
 func TestImin(t *testing.T) {
@@ -33,7 +42,7 @@ func TestImax(t *testing.T) {
 
 func TestStreamer(t *testing.T) {
 	for _, f := range []string{"data/a.bed", "data/ex.gff", "data/ex.bam"} {
-		s, e := Streamer(f)
+		s, e := Streamer(f, "")
 		if e != nil {
 			t.Errorf("got error: %s\n", e)
 		}

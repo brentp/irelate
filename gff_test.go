@@ -1,15 +1,27 @@
 package irelate
 
 import (
+	"os"
 	"testing"
 )
 
 func TestGff(t *testing.T) {
-	g1, e := GFFToRelatable("data/ex.gff")
+
+	f1, e := os.Open("data/ex.gff")
 	if e != nil {
 		t.Errorf("got error: %s\n", e)
 	}
-	g2, e := GFFToRelatable("data/ex.gff")
+	g1, e := GFFToRelatable(f1)
+	if e != nil {
+		t.Errorf("got error: %s\n", e)
+	}
+
+	f2, e := os.Open("data/ex.gff")
+	if e != nil {
+		t.Errorf("got error: %s\n", e)
+	}
+
+	g2, e := GFFToRelatable(f2)
 	if e != nil {
 		t.Errorf("got error: %s\n", e)
 	}

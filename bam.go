@@ -9,7 +9,6 @@ import (
 	"github.com/biogo/hts/bam"
 	"github.com/biogo/hts/sam"
 	"github.com/brentp/irelate/interfaces"
-	"github.com/brentp/xopen"
 )
 
 type Bam struct {
@@ -67,13 +66,9 @@ func check(err error) {
 	}
 }
 
-func BamToRelatable(file string) (RelatableChannel, error) {
+func BamToRelatable(f io.Reader) (RelatableChannel, error) {
 
 	ch := make(chan interfaces.Relatable, 64)
-	f, err := xopen.XReader(file)
-	if err != nil {
-		return nil, err
-	}
 	b, err := bam.NewReader(f, 0)
 	if err != nil {
 		return nil, err
