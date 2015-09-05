@@ -118,13 +118,13 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 		// use the cache to keep relatables to test against.
 
 		// (lowest ends at start of q) highest ends get popped first.
-		cache := lowEndRelatableQueue{make([]Relatable, 0, 1024)}
+		cache := NewPriorityQueue(1024, less)
 		v := <-stream
 		if v == nil {
 			close(out)
 			return
 		}
-		heap.Push(&cache, v)
+		cache.Put(v)
 		lastChrom := v.Chrom()
 
 		// Use sendQ to make sure we output in sorted order.
@@ -135,32 +135,34 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 		for interval := range stream {
 			// cache.rels orded with highest ends last.
 			// as soon as we are related, break:
-			for j = 0; j < len(cache.rels); j++ {
-				c := cache.rels[j]
+			for j = 0; j < len(cache.items); j++ {
+				c := cache.Peek()
 				if checkRelated(c, interval) {
 					break
 				}
 
 				if relativeTo == -1 || c.Source() == uint32(relativeTo) {
-					heap.Push(&sendQ, c)
+					// ignore the error since we must have enough.
+					v, _ := cache.Get(1)
+					heap.Push(&sendQ, v[0])
+
 				}
 			}
 
 			// all these have been sent to sendQ
-			cache.rels = cache.rels[j:]
 			minStart := ^uint32(0)
 
 			if interval.Chrom() != lastChrom {
 				sendSortedRelatables(&sendQ, minStart, out, less)
 				lastChrom = interval.Chrom()
-				if len(cache.rels) > 0 {
+				if len(cache.items) > 0 {
 					log.Fatalf("shouldn't have any overlaps across chromosomes")
 				}
 				if len(sendQ.rels) > 0 {
 					log.Fatalf("sendQ should be empty across chromosomes")
 				}
 			} else {
-				for _, c := range cache.rels {
+				for _, c := range cache.items {
 					if c.Start() < minStart {
 						minStart = c.Start()
 					}
@@ -170,9 +172,9 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 					sendSortedRelatables(&sendQ, minStart, out, less)
 				}
 			}
-			heap.Push(&cache, interval)
+			cache.Put(interval)
 		}
-		for _, c := range cache.rels {
+		for _, c := range cache.items {
 			if c.Source() == uint32(relativeTo) || relativeTo == -1 {
 				heap.Push(&sendQ, c)
 			}

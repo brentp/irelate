@@ -94,10 +94,8 @@ func (items *priorityItems) push(item interfaces.Relatable, less func(a, b inter
 // items that implement the Item interface and adds them
 // to the queue in priority order.
 type PriorityQueue struct {
-	less            func(a, b interfaces.Relatable) bool
-	items           priorityItems
-	itemMap         map[interfaces.Relatable]struct{}
-	allowDuplicates bool
+	less  func(a, b interfaces.Relatable) bool
+	items priorityItems
 }
 
 // Put adds items to the queue.
@@ -107,12 +105,7 @@ func (pq *PriorityQueue) Put(items ...interfaces.Relatable) error {
 	}
 
 	for _, item := range items {
-		if pq.allowDuplicates {
-			pq.items.push(item, pq.less)
-		} else if _, ok := pq.itemMap[item]; !ok {
-			pq.itemMap[item] = struct{}{}
-			pq.items.push(item, pq.less)
-		}
+		pq.items.push(item, pq.less)
 	}
 
 	return nil
@@ -128,23 +121,12 @@ func (pq *PriorityQueue) Get(number int) ([]interfaces.Relatable, error) {
 
 	var items []interfaces.Relatable
 
-	// Remove references to popped items.
-	deleteItems := func(items []interfaces.Relatable) {
-		for _, item := range items {
-			delete(pq.itemMap, item)
-		}
-	}
-
 	if len(pq.items) == 0 {
 		items = pq.items.get(number, pq.less)
-		if !pq.allowDuplicates {
-			deleteItems(items)
-		}
 		return items, nil
 	}
 
 	items = pq.items.get(number, pq.less)
-	deleteItems(items)
 	return items, nil
 }
 
@@ -169,11 +151,9 @@ func (pq *PriorityQueue) Len() int {
 }
 
 // NewPriorityQueue is the constructor for a priority queue.
-func NewPriorityQueue(hint int, allowDuplicates bool, less func(a, b interfaces.Relatable) bool) *PriorityQueue {
+func NewPriorityQueue(hint int, less func(a, b interfaces.Relatable) bool) *PriorityQueue {
 	return &PriorityQueue{
-		less:            less,
-		items:           make(priorityItems, 0, hint),
-		itemMap:         make(map[interfaces.Relatable]struct{}, hint),
-		allowDuplicates: allowDuplicates,
+		less:  less,
+		items: make(priorityItems, 0, hint),
 	}
 }
