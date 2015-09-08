@@ -18,8 +18,8 @@ func TestVCF(t *testing.T) {
 		t.Error("couldn't open remote file")
 	}
 
-	g1 := Vopen(r1)
-	g2 := Vopen(r2)
+	g1 := Vopen(r1, nil)
+	g2 := Vopen(r2, nil)
 
 	v1 := StreamVCF(g1)
 	v2 := StreamVCF(g2)

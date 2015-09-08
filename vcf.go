@@ -36,8 +36,14 @@ func (v *Variant) Related() []interfaces.Relatable {
 func (v *Variant) SetSource(src uint32) { v.source = src }
 func (v *Variant) Source() uint32       { return v.source }
 
-func Vopen(rdr io.Reader) *vcfgo.Reader {
-	vcf, err := vcfgo.NewReader(rdr, true)
+func Vopen(rdr io.Reader, hdr *vcfgo.Header) *vcfgo.Reader {
+	var vcf *vcfgo.Reader
+	var err error
+	if hdr == nil {
+		vcf, err = vcfgo.NewReader(rdr, true)
+	} else {
+		vcf, err = vcfgo.NewWithHeader(rdr, hdr, true)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}

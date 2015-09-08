@@ -122,7 +122,7 @@ func Streamer(f string, region string) (RelatableChannel, error) {
 	} else if strings.HasSuffix(f, ".gff") {
 		stream, err = GFFToRelatable(buf)
 	} else if strings.HasSuffix(f, ".vcf") || strings.HasSuffix(f, ".vcf.gz") {
-		v := Vopen(buf)
+		v := Vopen(buf, nil)
 		stream = StreamVCF(v)
 	} else {
 		stream = ScanToRelatable(buf, IntervalFromBedLine)
