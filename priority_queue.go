@@ -45,11 +45,11 @@ func (items *priorityItems) pop(less func(a, b interfaces.Relatable) bool) inter
 	childL, childR := 2*index+1, 2*index+2
 	for len(*items) > childL {
 		child := childL
-		if len(*items) > childR && less((*items)[childR], (*items)[childL]) {
+		if len(*items) > childR && !less((*items)[childR], (*items)[childL]) {
 			child = childR
 		}
 
-		if less((*items)[child], (*items)[index]) {
+		if !less((*items)[child], (*items)[index]) {
 			items.swap(index, child)
 
 			index = child
@@ -82,7 +82,7 @@ func (items *priorityItems) push(item interfaces.Relatable, less func(a, b inter
 	// 'Bubble up' to restore heap property.
 	index := len(*items) - 1
 	parent := int((index - 1) / 2)
-	for parent >= 0 && !less((*items)[parent], item) {
+	for parent != index && parent >= 0 && less((*items)[parent], item) {
 		items.swap(index, parent)
 
 		index = parent

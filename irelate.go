@@ -135,8 +135,24 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 		for interval := range stream {
 			// cache.rels orded with highest ends last.
 			// as soon as we are related, break:
+
+			minStart := ^uint32(0)
+			if interval.Chrom() != lastChrom {
+				vals, _ := cache.Get(cache.Len())
+				for _, v := range vals {
+					heap.Push(&sendQ, v)
+				}
+
+				sendSortedRelatables(&sendQ, minStart, out, less)
+				lastChrom = interval.Chrom()
+				if len(sendQ.rels) > 0 {
+					log.Fatalf("sendQ should be empty across chromosomes")
+				}
+			}
+
 			for j = 0; j < len(cache.items); j++ {
 				c := cache.Peek()
+				log.Println("peek:", c)
 				if checkRelated(c, interval) {
 					break
 				}
@@ -150,27 +166,15 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 			}
 
 			// all these have been sent to sendQ
-			minStart := ^uint32(0)
 
-			if interval.Chrom() != lastChrom {
+			for _, c := range cache.items {
+				if c.Start() < minStart {
+					minStart = c.Start()
+				}
+				relate(c, interval, relativeTo)
+			}
+			if len(sendQ.rels) > 5 {
 				sendSortedRelatables(&sendQ, minStart, out, less)
-				lastChrom = interval.Chrom()
-				if len(cache.items) > 0 {
-					log.Fatalf("shouldn't have any overlaps across chromosomes")
-				}
-				if len(sendQ.rels) > 0 {
-					log.Fatalf("sendQ should be empty across chromosomes")
-				}
-			} else {
-				for _, c := range cache.items {
-					if c.Start() < minStart {
-						minStart = c.Start()
-					}
-					relate(c, interval, relativeTo)
-				}
-				if len(sendQ.rels) > 5 {
-					sendSortedRelatables(&sendQ, minStart, out, less)
-				}
 			}
 			cache.Put(interval)
 		}

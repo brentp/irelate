@@ -3,6 +3,7 @@ package irelate
 import (
 	"container/heap"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 
@@ -43,10 +44,12 @@ func TestFunctional(t *testing.T) {
 
 	seen2 := false
 	highest := uint32(0)
+	log.Println("calling irelate")
 	for v := range IRelate(CheckRelatedByOverlap, 0, Less, a, b) {
+		log.Println(v)
 		if seen2 {
 			if v.Chrom() != "chr2" || v.Start() < highest {
-				t.Error("out of order")
+				t.Error("out of order", v.Chrom())
 			}
 			highest = v.Start()
 		}
