@@ -8,8 +8,6 @@ import (
 	"os"
 
 	. "github.com/brentp/irelate/interfaces"
-
-	"vbom.ml/util/sortorder"
 )
 
 // RelatableChannel
@@ -41,7 +39,7 @@ func Less(a Relatable, b Relatable) bool {
 // 1, 2, 3 ... 9, 10, 11...
 func NaturalLessPrefix(a Relatable, b Relatable) bool {
 	if !SameChrom(a.Chrom(), b.Chrom()) {
-		return sortorder.NaturalLess(StripChr(a.Chrom()), StripChr(b.Chrom()))
+		return NaturalLess(StripChr(a.Chrom()), StripChr(b.Chrom()))
 	}
 	return a.Start() < b.Start() || (a.Start() == b.Start() && a.End() < b.End())
 
