@@ -9,7 +9,8 @@ import (
 	"runtime/pprof"
 	"syscall"
 
-	I "github.com/brentp/irelate"
+	"github.com/brentp/irelate"
+	I "github.com/brentp/irelate/interfaces"
 )
 
 func init() {
@@ -35,7 +36,7 @@ func main() {
 	streams := make([]I.RelatableChannel, 0)
 	for _, f := range files {
 		// Streamer automatically returns a Relatalbe Channel for bam/gff/bed(.gz)
-		s, _ := I.Streamer(f, "")
+		s, _ := irelate.Streamer(f, "")
 		streams = append(streams, s)
 	}
 
@@ -51,7 +52,7 @@ func main() {
 	buf := bufio.NewWriter(os.Stdout)
 
 	//for interval := range I.IRelate(merged, I.CheckRelatedByOverlap) {
-	for interval := range I.IRelate(I.CheckRelatedByOverlap, 0, I.Less, streams...) {
+	for interval := range irelate.IRelate(irelate.CheckRelatedByOverlap, 0, irelate.Less, streams...) {
 		// for bam output:
 		// bam := *(interval).(*I.Bam)
 		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
