@@ -85,9 +85,8 @@ func Streamer(f string, region string) (RelatableChannel, error) {
 	var err error
 
 	var rdr io.Reader
-	var bx *bix.Bix
 	if region != "" {
-		bx, err = bix.New(f)
+		bx, err := bix.New(f)
 		if err != nil {
 			return nil, err
 		}
