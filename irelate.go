@@ -217,7 +217,7 @@ func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableC
 			interval = heap.Pop(&q).(Relatable)
 			source := interval.Source()
 			ch <- interval
-			if SameChrom(interval.Chrom(), lastChrom) {
+			if !SameChrom(interval.Chrom(), lastChrom) {
 				lastChrom = StripChr(interval.Chrom())
 				if _, ok := seen[lastChrom]; ok {
 					log.Println("warning: chromosomes must be in different order between files or the chromosome sort order is not as expected.")
