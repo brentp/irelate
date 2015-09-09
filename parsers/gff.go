@@ -1,6 +1,6 @@
 // Implements Relatable for Gff
 
-package irelate
+package parsers
 
 import (
 	"io"
@@ -40,7 +40,7 @@ func (g *Gff) Source() uint32 {
 	return g._source
 }
 
-func GFFToRelatable(fh io.Reader) (RelatableChannel, error) {
+func GFFToRelatable(fh io.Reader) (interfaces.RelatableChannel, error) {
 
 	ch := make(chan interfaces.Relatable, 16)
 

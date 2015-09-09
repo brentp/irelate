@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/brentp/irelate/interfaces"
+	"github.com/brentp/irelate/parsers"
 	"github.com/brentp/vcfgo"
 	"github.com/brentp/xopen"
 )
@@ -18,11 +19,11 @@ func TestVCF(t *testing.T) {
 		t.Error("couldn't open remote file")
 	}
 
-	g1 := Vopen(r1, nil)
-	g2 := Vopen(r2, nil)
+	g1 := parsers.Vopen(r1, nil)
+	g2 := parsers.Vopen(r2, nil)
 
-	v1 := StreamVCF(g1)
-	v2 := StreamVCF(g2)
+	v1 := parsers.StreamVCF(g1)
+	v2 := parsers.StreamVCF(g2)
 	for i := range IRelate(CheckRelatedByOverlap, 0, Less, v1, v2) {
 		if len(i.Related()) == 0 {
 			t.Errorf("should have another relation: %d", len(i.Related()))
@@ -46,7 +47,7 @@ var v1 = vcfgo.Variant{
 
 func TestNewVariant(t *testing.T) {
 
-	iv := NewVariant(&v1, uint32(1), []interfaces.Relatable{})
+	iv := parsers.NewVariant(&v1, uint32(1), []interfaces.Relatable{})
 	if len(iv.Related()) != 0 {
 		t.Errorf("shouldn't have any relateds")
 	}

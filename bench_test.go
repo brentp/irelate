@@ -2,12 +2,14 @@ package irelate
 
 import (
 	"testing"
+
+	"github.com/brentp/irelate/interfaces"
 )
 
 func benchmarkStreams(nStreams int, b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
-		streams := make([]RelatableChannel, 0)
+		streams := make([]interfaces.RelatableChannel, 0)
 		f := "data/test.bed.gz"
 
 		for i := 0; i < nStreams; i++ {

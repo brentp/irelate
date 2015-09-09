@@ -3,6 +3,9 @@ package interfaces
 
 import "strings"
 
+// RelatableChannel
+type RelatableChannel chan Relatable
+
 // IPosition allows accessing positional interface for genomic types.
 type IPosition interface {
 	Chrom() string

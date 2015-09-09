@@ -13,6 +13,7 @@ import (
 
 	"github.com/brentp/bix"
 	"github.com/brentp/irelate/interfaces"
+	"github.com/brentp/irelate/parsers"
 	"github.com/brentp/xopen"
 )
 
@@ -24,7 +25,7 @@ func OpenScanFile(fh io.Reader) (*bufio.Scanner, io.Reader) {
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.
-func ScanToRelatable(file io.Reader, fn func(line string) (interfaces.Relatable, error)) RelatableChannel {
+func ScanToRelatable(file io.Reader, fn func(line string) (interfaces.Relatable, error)) interfaces.RelatableChannel {
 	scanner, fh := OpenScanFile(file)
 	ch := make(chan interfaces.Relatable, 32)
 	go func() {
@@ -80,7 +81,7 @@ func RegionToParts(region string) (string, int, int, error) {
 	return parts[0], s, e, nil
 }
 
-func Streamer(f string, region string) (RelatableChannel, error) {
+func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
 	var stream chan interfaces.Relatable
 	var err error
 
@@ -117,14 +118,14 @@ func Streamer(f string, region string) (RelatableChannel, error) {
 	}
 
 	if strings.HasSuffix(f, ".bam") {
-		stream, err = BamToRelatable(buf)
+		stream, err = parsers.BamToRelatable(buf)
 	} else if strings.HasSuffix(f, ".gff") {
-		stream, err = GFFToRelatable(buf)
+		stream, err = parsers.GFFToRelatable(buf)
 	} else if strings.HasSuffix(f, ".vcf") || strings.HasSuffix(f, ".vcf.gz") {
-		v := Vopen(buf, nil)
-		stream = StreamVCF(v)
+		v := parsers.Vopen(buf, nil)
+		stream = parsers.StreamVCF(v)
 	} else {
-		stream = ScanToRelatable(buf, IntervalFromBedLine)
+		stream = ScanToRelatable(buf, parsers.IntervalFromBedLine)
 	}
 	return stream, err
 }

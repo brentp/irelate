@@ -3,6 +3,8 @@ package irelate
 import (
 	"os"
 	"testing"
+
+	"github.com/brentp/irelate/parsers"
 )
 
 func TestGff(t *testing.T) {
@@ -11,7 +13,7 @@ func TestGff(t *testing.T) {
 	if e != nil {
 		t.Errorf("got error: %s\n", e)
 	}
-	g1, e := GFFToRelatable(f1)
+	g1, e := parsers.GFFToRelatable(f1)
 	if e != nil {
 		t.Errorf("got error: %s\n", e)
 	}
@@ -21,7 +23,7 @@ func TestGff(t *testing.T) {
 		t.Errorf("got error: %s\n", e)
 	}
 
-	g2, e := GFFToRelatable(f2)
+	g2, e := parsers.GFFToRelatable(f2)
 	if e != nil {
 		t.Errorf("got error: %s\n", e)
 	}

@@ -1,6 +1,6 @@
 // Implements Relatable for Bam
 
-package irelate
+package parsers
 
 import (
 	"io"
@@ -66,7 +66,7 @@ func check(err error) {
 	}
 }
 
-func BamToRelatable(f io.Reader) (RelatableChannel, error) {
+func BamToRelatable(f io.Reader) (interfaces.RelatableChannel, error) {
 
 	ch := make(chan interfaces.Relatable, 64)
 	b, err := bam.NewReader(f, 0)

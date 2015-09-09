@@ -1,4 +1,4 @@
-package irelate
+package parsers
 
 import (
 	"strconv"
@@ -18,6 +18,10 @@ type Interval struct {
 	Fields  []string
 	source  uint32
 	related []interfaces.Relatable
+}
+
+func NewInterval(chrom string, start uint32, end uint32, fields []string, source uint32, related []interfaces.Relatable) *Interval {
+	return &Interval{chrom, start, end, fields, source, related}
 }
 
 func (i *Interval) Chrom() string                   { return i.chrom }

@@ -3,11 +3,13 @@ package irelate
 import (
 	"testing"
 
+	"github.com/brentp/irelate/interfaces"
+	"github.com/brentp/irelate/parsers"
 	"github.com/brentp/xopen"
 )
 
 func TestBam(t *testing.T) {
-	var g RelatableChannel
+	var g interfaces.RelatableChannel
 	g, _ = Streamer("data/ex.bam", "")
 	for i := range IRelate(CheckRelatedByOverlap, 0, Less, g) {
 		if len(i.Related()) != 0 {
@@ -16,7 +18,7 @@ func TestBam(t *testing.T) {
 		}
 		i.SetSource(0)
 		i.AddRelated(i)
-		m := i.(*Bam).MapQ()
+		m := i.(*parsers.Bam).MapQ()
 		if !(0 <= m && m <= 60) {
 			t.Errorf("bad mapping quality: %d", m)
 		}
@@ -42,8 +44,8 @@ func TestRemoteBam(t *testing.T) {
 		t.Errorf("couldn't open local bam")
 	}
 
-	b1, _ := BamToRelatable(f1)
-	b2, _ := BamToRelatable(f2)
+	b1, _ := parsers.BamToRelatable(f1)
+	b2, _ := parsers.BamToRelatable(f2)
 	for interval := range IRelate(CheckRelatedByOverlap, 0, Less, b1, b2) {
 		if len(interval.Related()) == 0 {
 			t.Errorf("should not have other relation: %s", interval)

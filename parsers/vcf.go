@@ -1,4 +1,4 @@
-package irelate
+package parsers
 
 import (
 	"io"
@@ -50,8 +50,8 @@ func Vopen(rdr io.Reader, hdr *vcfgo.Header) *vcfgo.Reader {
 	return vcf
 }
 
-func StreamVCF(vcf *vcfgo.Reader) RelatableChannel {
-	ch := make(RelatableChannel, 256)
+func StreamVCF(vcf *vcfgo.Reader) interfaces.RelatableChannel {
+	ch := make(interfaces.RelatableChannel, 256)
 	go func() {
 		j := 0
 		for {

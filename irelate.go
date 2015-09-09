@@ -10,9 +10,6 @@ import (
 	. "github.com/brentp/irelate/interfaces"
 )
 
-// RelatableChannel
-type RelatableChannel chan Relatable
-
 func relate(a Relatable, b Relatable, relativeTo int) {
 	if a.Source() != b.Source() {
 		if relativeTo == -1 {
