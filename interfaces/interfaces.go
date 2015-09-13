@@ -73,7 +73,7 @@ func SamePosition(a, b IPosition) bool {
 }
 
 func OverlapsPosition(a, b IPosition) bool {
-	return (b.Start() < a.End() && b.End() >= a.Start()) && SameChrom(a.Chrom(), b.Chrom())
+	return (b.Start() < a.End() && b.End() > a.Start()) && SameChrom(a.Chrom(), b.Chrom())
 }
 
 func SameVariant(a, b IVariant) bool {
