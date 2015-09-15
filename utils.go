@@ -17,6 +17,9 @@ import (
 	"github.com/brentp/xopen"
 )
 
+const MaxUint32 = ^uint32(0)
+const MaxInt32 = int(MaxUint32 >> 1)
+
 // OpenScanFile sets up a (possibly gzipped) file for line-wise reading.
 func OpenScanFile(fh io.Reader) (*bufio.Scanner, io.Reader) {
 	scanner := bufio.NewScanner(fh)
@@ -66,6 +69,11 @@ func Imax(a uint32, b uint32) uint32 {
 
 func RegionToParts(region string) (string, int, int, error) {
 	parts := strings.Split(region, ":")
+	// e.g. just "chr"
+	if len(parts) == 1 {
+		parts = append(parts, fmt.Sprintf("1-%d", MaxInt32))
+	}
+
 	se := strings.Split(parts[1], "-")
 	if len(se) != 2 {
 		return "", 0, 0, errors.New(fmt.Sprintf("unable to parse region: %s", region))
@@ -105,14 +113,20 @@ func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
 	var buf io.Reader
 	if !strings.HasSuffix(f, ".bam") {
 		bufr := bufio.NewReader(rdr)
-		if is, err := xopen.IsGzip(bufr); is {
-			buf, err = gzip.NewReader(bufr)
-			if err != nil {
-				return nil, err
+		used := false
+		if region == "" {
+			if is, err := xopen.IsGzip(bufr); is {
+				buf, err = gzip.NewReader(bufr)
+				used = true
+				if err != nil {
+					return nil, err
+				}
 			}
-		} else {
-			buf = bufr
 		}
+		if !used {
+			buf = rdr
+		}
+
 	} else {
 		buf = rdr
 	}
