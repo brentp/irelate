@@ -17,6 +17,12 @@ type RandomGetter interface {
 	Get(query IPosition) []IPosition
 }
 
+// Interface to get the CIPos and CIEND from a VCF. Returns start, end, ok.
+type CIFace interface {
+	CIPos() (uint32, uint32, bool)
+	CIEnd() (uint32, uint32, bool)
+}
+
 // A RandomChannel accepts a single IPosition and returns a slice of all overlapping positions.
 type RandomChannel interface {
 	Relate(chan IPosition) chan []IPosition
