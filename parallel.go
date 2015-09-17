@@ -32,9 +32,12 @@ func min(a, b int) int {
 
 func sliceToChan(A []interfaces.Relatable) interfaces.RelatableChannel {
 	m := make(interfaces.RelatableChannel, 256)
-	for _, r := range A {
-		m <- r
-	}
+	go func() {
+		for _, r := range A {
+			m <- r
+		}
+		close(m)
+	}()
 	return m
 }
 
@@ -97,7 +100,6 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 			if !ok {
 				break
 			}
-			wg.Done()
 			go func(streams []interfaces.RelatableChannel) {
 				ochan := make(chan interfaces.Relatable, 4096)
 				tochannels <- ochan
@@ -106,6 +108,7 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 					ochan <- interval
 				}
 				close(ochan)
+				wg.Done()
 			}(streams)
 		}
 		close(tochannels)
@@ -139,7 +142,7 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 		// 1. switch chroms
 		// 2. see maxGap bases between adjacent intervals (currently looks at start only)
 		// 3. reaches chunkSize (and has at least a gap of 2 bases from last interval).
-		if v.Chrom() != lastChrom || (len(A) > 0 && int(v.Start())-lastStart > maxGap) || (int(v.Start())-lastStart > 2 && len(A) >= chunk) {
+		if v.Chrom() != lastChrom || (len(A) > 0 && int(v.Start())-lastStart > maxGap) || ((int(v.Start())-lastStart > 2 && len(A) >= chunk) || len(A) >= chunk+10) {
 			if len(A) > 0 {
 				streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
 				// send work to IRelate
@@ -160,8 +163,8 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 	if len(A) > 0 {
 		streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
 		// send work to IRelate
-		fromchannels <- streams
 		wg.Add(1)
+		fromchannels <- streams
 	}
 
 	// wait for all of the sending to finish before we close this channel

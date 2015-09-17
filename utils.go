@@ -124,7 +124,7 @@ func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
 			}
 		}
 		if !used {
-			buf = rdr
+			buf = bufr
 		}
 
 	} else {

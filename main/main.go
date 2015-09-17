@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"runtime/pprof"
@@ -26,6 +27,15 @@ func init() {
 		}
 	}()
 }
+func main0() {
+	files := os.Args[1:]
+	buf := bufio.NewWriter(os.Stdout)
+	log.Println(files)
+	for interval := range irelate.PIRelate(1000, 10, "", files[0], files[1:]...) {
+		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
+	}
+	buf.Flush()
+}
 
 func main() {
 
@@ -36,6 +46,7 @@ func main() {
 	streams := make([]I.RelatableChannel, 0)
 	for _, f := range files {
 		// Streamer automatically returns a Relatalbe Channel for bam/gff/bed(.gz)
+		log.Println(f)
 		s, _ := irelate.Streamer(f, "")
 		streams = append(streams, s)
 	}
