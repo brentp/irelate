@@ -3,7 +3,6 @@ package irelate
 import (
 	"fmt"
 	"log"
-	"sync"
 
 	"github.com/brentp/irelate/interfaces"
 )
@@ -30,8 +29,15 @@ func min(a, b int) int {
 	return b
 }
 
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func sliceToChan(A []interfaces.Relatable) interfaces.RelatableChannel {
-	m := make(interfaces.RelatableChannel, 256)
+	m := make(interfaces.RelatableChannel, 512)
 	go func() {
 		for _, r := range A {
 			m <- r
@@ -44,7 +50,7 @@ func sliceToChan(A []interfaces.Relatable) interfaces.RelatableChannel {
 // make a set of streams ready to be sent to irelate.
 func makeStreams(A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) []interfaces.RelatableChannel {
 
-	streams := make([]interfaces.RelatableChannel, 0, 12)
+	streams := make([]interfaces.RelatableChannel, 0, len(paths)+1)
 	streams = append(streams, sliceToChan(A))
 
 	region := fmt.Sprintf("%s:%d-%d", lastChrom, minStart, maxEnd)
@@ -58,13 +64,6 @@ func makeStreams(A []interfaces.Relatable, lastChrom string, minStart int, maxEn
 	}
 
 	return streams
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func checkOverlap(a, b interfaces.Relatable) bool {
@@ -84,10 +83,10 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 	}
 
 	// wg is so we know when where no longer recieving chunks of data.
-	var wg sync.WaitGroup
+	//var wg sync.WaitGroup
 
 	// final interval stream sent back to caller.
-	intersected := make(chan interfaces.Relatable, 4096)
+	intersected := make(chan interfaces.Relatable, 512)
 	// fromchannels receives lists of relatables ready to be sent to IRelate
 	fromchannels := make(chan []interfaces.RelatableChannel, 5)
 	// to channels recieves channels to accept intervals from IRelate
@@ -100,18 +99,20 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 			if !ok {
 				break
 			}
+			ochan := make(chan interfaces.Relatable, 2)
+			tochannels <- ochan
 			go func(streams []interfaces.RelatableChannel) {
-				ochan := make(chan interfaces.Relatable, 4096)
-				tochannels <- ochan
+				j := 0
 
 				for interval := range IRelate(checkOverlap, 0, less, streams...) {
+					j += 1
 					ochan <- interval
 				}
 				close(ochan)
-				wg.Done()
 			}(streams)
 		}
 		close(tochannels)
+		//wg.Done()
 	}()
 
 	// merge the intervals from different channels keeping order.
@@ -126,50 +127,53 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 				intersected <- interval
 			}
 		}
+
+		// wait for all of the sending to finish before we close this channel
+		//wg.Wait()
 		close(intersected)
 	}()
 
-	A := make([]interfaces.Relatable, 0, chunk)
+	A := make([]interfaces.Relatable, 0, chunk+10)
 
 	lastStart := -10
 	lastChrom := ""
 	minStart := int(^uint32(0) >> 1)
 	maxEnd := 0
 
-	for v := range qstream {
-		s, e := getStartEnd(v)
-		// end chunk when:
-		// 1. switch chroms
-		// 2. see maxGap bases between adjacent intervals (currently looks at start only)
-		// 3. reaches chunkSize (and has at least a gap of 2 bases from last interval).
-		if v.Chrom() != lastChrom || (len(A) > 0 && int(v.Start())-lastStart > maxGap) || ((int(v.Start())-lastStart > 2 && len(A) >= chunk) || len(A) >= chunk+10) {
-			if len(A) > 0 {
-				streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
-				// send work to IRelate
-				fromchannels <- streams
-				wg.Add(1)
+	go func() {
+
+		for v := range qstream {
+			s, e := getStartEnd(v)
+			// end chunk when:
+			// 1. switch chroms
+			// 2. see maxGap bases between adjacent intervals (currently looks at start only)
+			// 3. reaches chunkSize (and has at least a gap of 2 bases from last interval).
+			if v.Chrom() != lastChrom || (len(A) > 0 && int(v.Start())-lastStart > maxGap) || ((int(v.Start())-lastStart > 2 && len(A) >= chunk) || len(A) >= chunk+10) {
+				if len(A) > 0 {
+					streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
+					// send work to IRelate
+					fromchannels <- streams
+					//wg.Add(1)
+				}
+				lastStart = int(v.Start())
+				lastChrom, minStart, maxEnd = v.Chrom(), s, e
+				A = make([]interfaces.Relatable, 0, chunk+10)
+			} else {
+				lastStart = int(v.Start())
+				maxEnd = max(e, maxEnd)
+				minStart = min(s, minStart)
 			}
-			lastStart = int(v.Start())
-			lastChrom, minStart, maxEnd = v.Chrom(), s, e
-			A = make([]interfaces.Relatable, 0, chunk)
-		} else {
-			lastStart = int(v.Start())
-			maxEnd = max(e, maxEnd)
-			minStart = min(s, minStart)
+
+			A = append(A, v)
 		}
 
-		A = append(A, v)
-	}
-	if len(A) > 0 {
-		streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
-		// send work to IRelate
-		wg.Add(1)
-		fromchannels <- streams
-	}
-
-	// wait for all of the sending to finish before we close this channel
-	go func() {
-		wg.Wait()
+		if len(A) > 0 {
+			streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
+			// send work to IRelate
+			//wg.Add(1)
+			fromchannels <- streams
+			//wg.Add(1)
+		}
 		close(fromchannels)
 	}()
 

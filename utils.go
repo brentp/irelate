@@ -2,7 +2,6 @@ package irelate
 
 import (
 	"bufio"
-	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -46,6 +45,8 @@ func ScanToRelatable(file io.Reader, fn func(line string) (interfaces.Relatable,
 			}
 		}
 		if c, ok := fh.(io.ReadCloser); ok {
+			c.Close()
+		} else if c, ok := file.(io.ReadCloser); ok {
 			c.Close()
 		}
 		close(ch)
@@ -112,20 +113,22 @@ func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
 	}
 	var buf io.Reader
 	if !strings.HasSuffix(f, ".bam") {
-		bufr := bufio.NewReader(rdr)
-		used := false
-		if region == "" {
-			if is, err := xopen.IsGzip(bufr); is {
-				buf, err = gzip.NewReader(bufr)
-				used = true
-				if err != nil {
-					return nil, err
+		/*
+			bufr := bufio.NewReader(rdr)
+			used := false
+			if region == "" {
+				if is, err := xopen.IsGzip(bufr); is {
+					buf, err = gzip.NewReader(bufr)
+					used = true
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
-		}
-		if !used {
-			buf = bufr
-		}
+			if !used {
+				buf = bufr
+			}*/
+		buf = xopen.Buf(rdr)
 
 	} else {
 		buf = rdr

@@ -27,17 +27,16 @@ func init() {
 		}
 	}()
 }
-func main0() {
+func main() {
 	files := os.Args[1:]
 	buf := bufio.NewWriter(os.Stdout)
-	log.Println(files)
-	for interval := range irelate.PIRelate(1000, 10, "", files[0], files[1:]...) {
+	for interval := range irelate.PIRelate(50000, 25000, "", files[0], files[1:]...) {
 		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 	}
 	buf.Flush()
 }
 
-func main() {
+func main0() {
 
 	cpuProfile := flag.Bool("cpuProfile", false, "perform CPU profiling")
 	flag.Parse()
