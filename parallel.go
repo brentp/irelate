@@ -82,9 +82,6 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 		panic(err)
 	}
 
-	// wg is so we know when where no longer recieving chunks of data.
-	//var wg sync.WaitGroup
-
 	// final interval stream sent back to caller.
 	intersected := make(chan interfaces.Relatable, 512)
 	// fromchannels receives lists of relatables ready to be sent to IRelate
@@ -112,7 +109,6 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 			}(streams)
 		}
 		close(tochannels)
-		//wg.Done()
 	}()
 
 	// merge the intervals from different channels keeping order.
@@ -129,7 +125,6 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 		}
 
 		// wait for all of the sending to finish before we close this channel
-		//wg.Wait()
 		close(intersected)
 	}()
 
@@ -153,7 +148,6 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 					streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
 					// send work to IRelate
 					fromchannels <- streams
-					//wg.Add(1)
 				}
 				lastStart = int(v.Start())
 				lastChrom, minStart, maxEnd = v.Chrom(), s, e
@@ -170,9 +164,7 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 		if len(A) > 0 {
 			streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
 			// send work to IRelate
-			//wg.Add(1)
 			fromchannels <- streams
-			//wg.Add(1)
 		}
 		close(fromchannels)
 	}()
