@@ -37,7 +37,7 @@ func max(a, b int) int {
 }
 
 func sliceToChan(A []interfaces.Relatable) interfaces.RelatableChannel {
-	m := make(interfaces.RelatableChannel, 512)
+	m := make(interfaces.RelatableChannel, 128)
 	go func() {
 		for _, r := range A {
 			m <- r
@@ -83,11 +83,13 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 	}
 
 	// final interval stream sent back to caller.
-	intersected := make(chan interfaces.Relatable, 512)
+	intersected := make(chan interfaces.Relatable, 4096)
 	// fromchannels receives lists of relatables ready to be sent to IRelate
-	fromchannels := make(chan []interfaces.RelatableChannel, 5)
-	// to channels recieves channels to accept intervals from IRelate
-	tochannels := make(chan chan interfaces.Relatable, 5)
+	fromchannels := make(chan []interfaces.RelatableChannel, 3)
+
+	// to channels recieves channels to accept intervals from IRelate to be sent for merging.
+	// we send slices of intervals to reduce locking.
+	tochannels := make(chan chan []interfaces.Relatable, 3)
 
 	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
 	go func() {
@@ -96,14 +98,21 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 			if !ok {
 				break
 			}
-			ochan := make(chan interfaces.Relatable, 2)
+			N := 500
+			ochan := make(chan []interfaces.Relatable, 5)
 			tochannels <- ochan
+			saved := make([]interfaces.Relatable, N)
 			go func(streams []interfaces.RelatableChannel) {
 				j := 0
 
 				for interval := range IRelate(checkOverlap, 0, less, streams...) {
+					saved[j] = interval
 					j += 1
-					ochan <- interval
+					if j > 0 && j%N == 0 {
+						ochan <- saved
+						saved = make([]interfaces.Relatable, N)
+						j = 0
+					}
 				}
 				close(ochan)
 			}(streams)
@@ -119,8 +128,10 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 				break
 			}
 
-			for interval := range ch {
-				intersected <- interval
+			for intervals := range ch {
+				for _, interval := range intervals {
+					intersected <- interval
+				}
 			}
 		}
 
