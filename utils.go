@@ -90,13 +90,30 @@ func RegionToParts(region string) (string, int, int, error) {
 	return parts[0], s, e, nil
 }
 
+type location struct {
+	chrom string
+	start int
+	end   int
+}
+
+func (l location) RefName() string {
+	return l.chrom
+}
+
+func (l location) Start() int {
+	return l.start
+}
+func (l location) End() int {
+	return l.end
+}
+
 func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
 	var stream chan interfaces.Relatable
 	var err error
 
 	var rdr io.Reader
 	if region != "" {
-		bx, err := bix.New(f)
+		bx, err := bix.New(f, 2)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +121,7 @@ func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
 		if err != nil {
 			return nil, err
 		}
-		rdr, err = bx.Query(chrom, start, end, true)
+		rdr, err = bx.ChunkedReader(location{chrom, start, end}, true)
 	} else {
 		rdr, err = os.Open(f)
 	}

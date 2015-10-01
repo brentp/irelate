@@ -151,7 +151,7 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 				if checkRelated(c, interval) {
 					relate(c, interval, relativeTo)
 				} else {
-					if relativeTo == -1 || c.Source() == uint32(relativeTo) {
+					if relativeTo == -1 || int(c.Source()) == relativeTo {
 						heap.Push(&sendQ, c)
 					}
 					cache[i] = nil
@@ -173,7 +173,7 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 
 		}
 		for _, c := range filter(cache, nils) {
-			if c.Source() == uint32(relativeTo) || relativeTo == -1 {
+			if int(c.Source()) == relativeTo || relativeTo == -1 {
 				heap.Push(&sendQ, c)
 			}
 		}

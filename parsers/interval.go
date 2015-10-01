@@ -44,7 +44,7 @@ func (i *Interval) String() string {
 }
 
 func IntervalFromBedLine(line string) (interfaces.Relatable, error) {
-	fields := strings.Split(line, "\t")
+	fields := strings.SplitN(line, "\t", 4)
 	fields[len(fields)-1] = strings.TrimRight(fields[len(fields)-1], "\r\n")
 	start, err := strconv.ParseUint(fields[1], 10, 32)
 	if err != nil {

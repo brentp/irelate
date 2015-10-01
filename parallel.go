@@ -37,7 +37,7 @@ func max(a, b int) int {
 }
 
 func sliceToChan(A []interfaces.Relatable) interfaces.RelatableChannel {
-	m := make(interfaces.RelatableChannel, 128)
+	m := make(interfaces.RelatableChannel, 24)
 	go func() {
 		for _, r := range A {
 			m <- r
@@ -78,13 +78,13 @@ func less(a, b interfaces.Relatable) bool {
 func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths ...string) interfaces.RelatableChannel {
 
 	// final interval stream sent back to caller.
-	intersected := make(chan interfaces.Relatable, 4096)
+	intersected := make(chan interfaces.Relatable, 2048)
 	// fromchannels receives lists of relatables ready to be sent to IRelate
-	fromchannels := make(chan []interfaces.RelatableChannel, 3)
+	fromchannels := make(chan []interfaces.RelatableChannel, 2)
 
 	// to channels recieves channels to accept intervals from IRelate to be sent for merging.
 	// we send slices of intervals to reduce locking.
-	tochannels := make(chan chan []interfaces.Relatable, 3)
+	tochannels := make(chan chan []interfaces.Relatable, 2)
 
 	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
 	go func() {
@@ -94,7 +94,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths 
 				break
 			}
 			N := 500
-			ochan := make(chan []interfaces.Relatable, 5)
+			ochan := make(chan []interfaces.Relatable, 2)
 			tochannels <- ochan
 			saved := make([]interfaces.Relatable, N)
 			go func(streams []interfaces.RelatableChannel) {
@@ -151,11 +151,13 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths 
 			// 1. switch chroms
 			// 2. see maxGap bases between adjacent intervals (currently looks at start only)
 			// 3. reaches chunkSize (and has at least a gap of 2 bases from last interval).
-			if v.Chrom() != lastChrom || (len(A) > 0 && int(v.Start())-lastStart > maxGap) || ((int(v.Start())-lastStart > 2 && len(A) >= chunk) || len(A) >= chunk+10) {
+			if v.Chrom() != lastChrom || (len(A) > 2048 && int(v.Start())-lastStart > maxGap) || ((int(v.Start())-lastStart > 5 && len(A) >= chunk) || len(A) >= chunk+100) || int(v.Start())-lastStart > 20*maxGap {
 				if len(A) > 0 {
 					streams := makeStreams(A, lastChrom, minStart, maxEnd, paths...)
 					// send work to IRelate
+					log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", v.Chrom(), A[0].Start(), A[len(A)-1].End()), "gap:", int(v.Start())-lastStart)
 					fromchannels <- streams
+
 				}
 				lastStart = int(v.Start())
 				lastChrom, minStart, maxEnd = v.Chrom(), s, e
