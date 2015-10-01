@@ -75,12 +75,7 @@ func less(a, b interfaces.Relatable) bool {
 }
 
 // PIRelate implements a parallel IRelate
-func PIRelate(chunk int, maxGap int, region string, query string, paths ...string) interfaces.RelatableChannel {
-
-	qstream, err := Streamer(query, region)
-	if err != nil {
-		panic(err)
-	}
+func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths ...string) interfaces.RelatableChannel {
 
 	// final interval stream sent back to caller.
 	intersected := make(chan interfaces.Relatable, 4096)
@@ -114,6 +109,9 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 						j = 0
 					}
 				}
+				if j != 0 {
+					ochan <- saved[:j]
+				}
 				close(ochan)
 			}(streams)
 		}
@@ -134,7 +132,6 @@ func PIRelate(chunk int, maxGap int, region string, query string, paths ...strin
 				}
 			}
 		}
-
 		// wait for all of the sending to finish before we close this channel
 		close(intersected)
 	}()
