@@ -1,9 +1,9 @@
 package irelate
 
 import (
+	"bytes"
 	"container/heap"
 	"fmt"
-	"strings"
 	"testing"
 
 	. "github.com/brentp/irelate/interfaces"
@@ -27,8 +27,8 @@ chr2	46587	46588
 chr2	46588	48588`
 
 func TestFunctional(t *testing.T) {
-	dats := strings.Split(data, "\n")
-	mk := func(dats []string) RelatableChannel {
+	dats := bytes.Split([]byte(data), []byte("\n"))
+	mk := func(dats [][]byte) RelatableChannel {
 		ch := make(RelatableChannel, 4)
 		go func() {
 			for _, d := range dats {
@@ -57,8 +57,8 @@ func TestFunctional(t *testing.T) {
 
 func Example() {
 	var a, b Relatable
-	a = parsers.NewInterval("chr1", 1234, 5678, strings.Split("chr1\t1234\t5678", "\t"), 1, nil)
-	b = parsers.NewInterval("chr1", 9234, 9678, strings.Split("chr1\t9234\t9678", "\t"), 0, nil)
+	a = parsers.NewInterval("chr1", 1234, 5678, bytes.Split([]byte("chr1\t1234\t5678"), []byte("\t")), 1, nil)
+	b = parsers.NewInterval("chr1", 9234, 9678, bytes.Split([]byte("chr1\t9234\t9678"), []byte("\t")), 0, nil)
 	fmt.Printf("%s\t%d\t%d\n", a.Chrom(), a.Start(), a.End())
 	fmt.Printf("%s\t%d\t%d\n", b.Chrom(), b.Start(), b.End())
 	fmt.Println(CheckRelatedByOverlap(a, b))
@@ -84,10 +84,10 @@ func Example() {
 
 func TestRelate(t *testing.T) {
 	var a, b Relatable
-	a, _ = parsers.IntervalFromBedLine("chr1\t1234\t5678")
+	a, _ = parsers.IntervalFromBedLine([]byte("chr1\t1234\t5678"))
 	a.SetSource(1)
 
-	b, _ = parsers.IntervalFromBedLine("chr1\t9234\t9678")
+	b, _ = parsers.IntervalFromBedLine([]byte("chr1\t9234\t9678"))
 	b.SetSource(0)
 
 	if len(a.Related()) != 0 {
@@ -109,10 +109,10 @@ func TestRelate(t *testing.T) {
 	}
 
 	// RESET
-	a, _ = parsers.IntervalFromBedLine("chr1\t1234\t5678")
+	a, _ = parsers.IntervalFromBedLine([]byte("chr1\t1234\t5678"))
 	a.SetSource(1)
 
-	b, _ = parsers.IntervalFromBedLine("chr1\t9234\t9678")
+	b, _ = parsers.IntervalFromBedLine([]byte("chr1\t9234\t9678"))
 	b.SetSource(0)
 
 	relate(a, b, int(a.Source()))
@@ -142,9 +142,9 @@ func TestRelate(t *testing.T) {
 }
 
 func TestQ(t *testing.T) {
-	a, _ := parsers.IntervalFromBedLine("chr1\t1234\t5678")
-	b, _ := parsers.IntervalFromBedLine("chr1\t9234\t9678")
-	c, _ := parsers.IntervalFromBedLine("chr2\t9234\t9678")
+	a, _ := parsers.IntervalFromBedLine([]byte("chr1\t1234\t5678"))
+	b, _ := parsers.IntervalFromBedLine([]byte("chr1\t9234\t9678"))
+	c, _ := parsers.IntervalFromBedLine([]byte("chr2\t9234\t9678"))
 
 	q := relatableQueue{rels: make([]Relatable, 0), less: Less}
 	heap.Init(&q)
@@ -171,9 +171,9 @@ func TestQ(t *testing.T) {
 
 func TestMerge(t *testing.T) {
 	var a, b, c Relatable
-	a, _ = parsers.IntervalFromBedLine("chr1\t1234\t5678")
-	b, _ = parsers.IntervalFromBedLine("chr1\t9234\t9678")
-	c, _ = parsers.IntervalFromBedLine("chr2\t9234\t9678")
+	a, _ = parsers.IntervalFromBedLine([]byte("chr1\t1234\t5678"))
+	b, _ = parsers.IntervalFromBedLine([]byte("chr1\t9234\t9678"))
+	c, _ = parsers.IntervalFromBedLine([]byte("chr2\t9234\t9678"))
 
 	nexta := func() RelatableChannel {
 		ch := make(chan Relatable, 2)
@@ -234,10 +234,10 @@ func TestMerge(t *testing.T) {
 
 func TestLessRelatableQueue(t *testing.T) {
 	var a, b Relatable
-	a, _ = parsers.IntervalFromBedLine("chr1\t3077640\t3080640")
+	a, _ = parsers.IntervalFromBedLine([]byte("chr1\t3077640\t3080640"))
 	a.SetSource(0)
 
-	b, _ = parsers.IntervalFromBedLine("chr1\t2985741\t3355185")
+	b, _ = parsers.IntervalFromBedLine([]byte("chr1\t2985741\t3355185"))
 	b.SetSource(1)
 
 	//a = &Interval{chrom: "chr1", start: 3077640, end: 3080640, source: 0}
@@ -259,10 +259,10 @@ func TestOverlapCheck(t *testing.T) {
 	//a := &Interval{chrom: "chr1", start: 3077640, end: 3080640, source: 0}
 	//b := &Interval{chrom: "chr1", start: 2985741, end: 3355185, source: 1}
 
-	a, _ := parsers.IntervalFromBedLine("chr1\t3077640\t3080640")
+	a, _ := parsers.IntervalFromBedLine([]byte("chr1\t3077640\t3080640"))
 	a.SetSource(0)
 
-	b, _ := parsers.IntervalFromBedLine("chr1\t2985741\t3355185")
+	b, _ := parsers.IntervalFromBedLine([]byte("chr1\t2985741\t3355185"))
 	b.SetSource(1)
 
 	if CheckRelatedByOverlap(a, b) != true {

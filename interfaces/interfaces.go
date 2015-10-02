@@ -6,6 +6,10 @@ import "strings"
 // RelatableChannel
 type RelatableChannel chan Relatable
 
+type RelatableGetter interface {
+	Next() Relatable
+}
+
 // IPosition allows accessing positional interface for genomic types.
 type IPosition interface {
 	Chrom() string
@@ -48,6 +52,7 @@ type Info interface {
 	Delete(key string)
 	Keys() []string
 	String() string
+	Bytes() []byte
 }
 
 // IVariant must implement IPosition as well as Ref, Alt, and Inof() methods for genetic variants

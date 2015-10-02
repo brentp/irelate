@@ -28,9 +28,15 @@ func init() {
 	}()
 }
 func main() {
+	f, err := os.Create("irelate.cpu.pprof")
+	if err != nil {
+		panic(err)
+	}
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
 	files := os.Args[1:]
 	buf := bufio.NewWriter(os.Stdout)
-	for interval := range irelate.PIRelate(50000, 25000, "", files[0], files[1:]...) {
+	for interval := range irelate.PIRelate(80000, 25000, "", files[0], files[1:]...) {
 		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 	}
 	buf.Flush()

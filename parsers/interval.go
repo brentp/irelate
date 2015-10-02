@@ -1,8 +1,10 @@
 package parsers
 
 import (
+	"bytes"
+	"log"
 	"strconv"
-	"strings"
+	"unsafe"
 
 	"github.com/brentp/irelate/interfaces"
 )
@@ -15,12 +17,12 @@ type Interval struct {
 	chrom   string
 	start   uint32
 	end     uint32
-	Fields  []string
+	Fields  [][]byte
 	source  uint32
 	related []interfaces.Relatable
 }
 
-func NewInterval(chrom string, start uint32, end uint32, fields []string, source uint32, related []interfaces.Relatable) *Interval {
+func NewInterval(chrom string, start uint32, end uint32, fields [][]byte, source uint32, related []interfaces.Relatable) *Interval {
 	return &Interval{chrom, start, end, fields, source, related}
 }
 
@@ -40,20 +42,27 @@ func (i *Interval) Source() uint32       { return i.source }
 func (i *Interval) SetSource(src uint32) { i.source = src }
 
 func (i *Interval) String() string {
-	return strings.Join(i.Fields, "\t")
+	return string(bytes.Join(i.Fields, []byte{'\t'}))
 }
 
-func IntervalFromBedLine(line string) (interfaces.Relatable, error) {
-	fields := strings.SplitN(line, "\t", 4)
-	fields[len(fields)-1] = strings.TrimRight(fields[len(fields)-1], "\r\n")
-	start, err := strconv.ParseUint(fields[1], 10, 32)
+func unsafeString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+func IntervalFromBedLine(line []byte) (interfaces.Relatable, error) {
+	line = bytes.TrimRight(line, "\r\n")
+	fields := bytes.Split([]byte(string(line)), []byte{'\t'})
+	start, err := strconv.ParseUint(unsafeString(fields[1]), 10, 32)
 	if err != nil {
 		return nil, err
 	}
-	end, err := strconv.ParseUint(fields[2], 10, 32)
+	end, err := strconv.ParseUint(unsafeString(fields[2]), 10, 32)
 	if err != nil {
 		return nil, err
 	}
-	i := Interval{chrom: fields[0], start: uint32(start), end: uint32(end), related: nil, Fields: fields}
+	if start == 85558 {
+		log.Fatal("line:", string(line))
+	}
+	i := Interval{chrom: string(fields[0]), start: uint32(start), end: uint32(end), related: nil, Fields: fields}
 	return &i, nil
 }

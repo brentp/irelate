@@ -1,8 +1,8 @@
 package irelate
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 	"testing"
 
 	. "github.com/brentp/irelate/interfaces"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestInterval(t *testing.T) {
-	a := parsers.NewInterval("chr1", 1234, 5678, strings.Split("chr1\t1234\t5678", "\t"), 0, nil)
+	a := parsers.NewInterval("chr1", 1234, 5678, bytes.Split([]byte("chr1\t1234\t5678"), []byte("\t")), 0, nil)
 	if a.Chrom() != "chr1" {
 		t.Error("expected \"chr1\", got", a.Chrom())
 	}
@@ -30,7 +30,7 @@ func TestInterval(t *testing.T) {
 
 func TestIntervalSource(t *testing.T) {
 	var a Relatable
-	a = parsers.NewInterval("chr1", 1234, 5678, strings.Split("chr1\t1234\t5678", "\t"), 0, nil)
+	a = parsers.NewInterval("chr1", 1234, 5678, bytes.Split([]byte("chr1\t1234\t5678"), []byte("\t")), 0, nil)
 	a.SetSource(222)
 
 	if a.Source() != 222 {
@@ -39,7 +39,7 @@ func TestIntervalSource(t *testing.T) {
 }
 
 func TestIntervalLine(t *testing.T) {
-	s := "chr1\t1235\t4567\tasdf"
+	s := []byte("chr1\t1235\t4567\tasdf")
 	i, _ := parsers.IntervalFromBedLine(s)
 	if i.Start() != uint32(1235) {
 		t.Error("expected start of 1235")
