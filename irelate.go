@@ -4,6 +4,7 @@ package irelate
 import (
 	"container/heap"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -121,7 +122,7 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 func IRelate(checkRelated func(a, b Relatable) bool,
 	relativeTo int,
 	less func(a, b Relatable) bool,
-	streams ...RelatableChannel) chan Relatable {
+	streams ...RelatableIterator) chan Relatable {
 
 	// we infer the chromosome order by the order that we see from source 0.
 	stream := Merge(less, relativeTo, streams...)
@@ -189,15 +190,18 @@ func IRelate(checkRelated func(a, b Relatable) bool,
 // Streams of Relatable's from different source must be merged to send
 // to IRelate.
 // This uses a priority queue and acts like python's heapq.merge.
-func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableChannel) RelatableChannel {
+func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableIterator) RelatableChannel {
 	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
 	q := relatableQueue{make([]Relatable, 0, len(streams)), less}
 	seen := make(map[string]struct{})
 	for i, stream := range streams {
-		interval := <-stream
+		interval, err := stream.Next()
 		if interval != nil {
 			interval.SetSource(uint32(i))
 			heap.Push(&q, interval)
+		}
+		if err == io.EOF {
+			stream.Close()
 		}
 	}
 
@@ -224,8 +228,8 @@ func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableC
 				}
 			}
 			// pull the next interval from the same source.
-			next_interval, ok := <-streams[source]
-			if ok {
+			next_interval, err := streams[source].Next()
+			if err == nil {
 				if next_interval.Start() < interval.Start() {
 					if SameChrom(next_interval.Chrom(), interval.Chrom()) {
 						panic(fmt.Sprintf("intervals out of order within file: starts at: %d and %d from source: %d", interval.Start(), next_interval.Start(), source))
@@ -243,6 +247,9 @@ func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableC
 					// relate to last query
 					j = 200000
 				}
+			}
+			if err == io.EOF {
+				streams[source].Close()
 			}
 		}
 		close(ch)

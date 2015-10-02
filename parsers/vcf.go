@@ -75,10 +75,14 @@ func (v vWrapper) Next() (interfaces.Relatable, error) {
 	return &Variant{r, 0, nil}, nil
 }
 
-func VCFIterator(buf io.Reader) (interfaces.RelatableIterator, error) {
+func (v vWrapper) AddInfoToHeader(id, itype, number, description string) {
+	v.Reader.AddInfoToHeader(id, itype, number, description)
+}
+
+func VCFIterator(buf io.Reader) (interfaces.RelatableIterator, *vcfgo.Reader, error) {
 	v, err := Vopen(buf, nil)
 	if err != nil {
-		return nil, err
+		return nil, v, err
 	}
-	return vWrapper{v}, nil
+	return vWrapper{v}, v, nil
 }

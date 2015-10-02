@@ -184,7 +184,7 @@ func Iterator(f string, region string) (interfaces.RelatableIterator, error) {
 	}
 	// TODO: gff, bam
 	if strings.HasSuffix(f, ".vcf") || strings.HasSuffix(f, ".vcf.gz") {
-		iterator, err = parsers.VCFIterator(buf)
+		iterator, _, err = parsers.VCFIterator(buf)
 		if err != nil {
 			return nil, err
 		}

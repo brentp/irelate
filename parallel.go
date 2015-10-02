@@ -2,6 +2,7 @@ package irelate
 
 import (
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/brentp/irelate/interfaces"
@@ -47,16 +48,38 @@ func sliceToChan(A []interfaces.Relatable) interfaces.RelatableChannel {
 	return m
 }
 
-// make a set of streams ready to be sent to irelate.
-func makeStreams(A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) []interfaces.RelatableChannel {
+type sliceIt struct {
+	slice []interfaces.Relatable
+	i     int
+}
 
-	streams := make([]interfaces.RelatableChannel, 0, len(paths)+1)
-	streams = append(streams, sliceToChan(A))
+func (s *sliceIt) Next() (interfaces.Relatable, error) {
+	if s.i < len(s.slice) {
+		v := s.slice[s.i]
+		s.i += 1
+		return v, nil
+	}
+	return nil, io.EOF
+
+}
+func (s *sliceIt) Close() error {
+	return nil
+}
+
+func sliceToIterator(A []interfaces.Relatable) interfaces.RelatableIterator {
+	return &sliceIt{A, 0}
+}
+
+// make a set of streams ready to be sent to irelate.
+func makeStreams(A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) []interfaces.RelatableIterator {
+
+	streams := make([]interfaces.RelatableIterator, 0, len(paths)+1)
+	streams = append(streams, sliceToIterator(A))
 
 	region := fmt.Sprintf("%s:%d-%d", lastChrom, minStart, maxEnd)
 
 	for _, path := range paths {
-		stream, err := Streamer(path, region)
+		stream, err := Iterator(path, region)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -75,16 +98,16 @@ func less(a, b interfaces.Relatable) bool {
 }
 
 // PIRelate implements a parallel IRelate
-func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths ...string) interfaces.RelatableChannel {
+func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, paths ...string) interfaces.RelatableChannel {
 
 	// final interval stream sent back to caller.
-	intersected := make(chan interfaces.Relatable, 2048)
+	intersected := make(chan interfaces.Relatable, 256)
 	// fromchannels receives lists of relatables ready to be sent to IRelate
-	fromchannels := make(chan []interfaces.RelatableChannel, 2)
+	fromchannels := make(chan []interfaces.RelatableIterator, 3)
 
 	// to channels recieves channels to accept intervals from IRelate to be sent for merging.
 	// we send slices of intervals to reduce locking.
-	tochannels := make(chan chan []interfaces.Relatable, 2)
+	tochannels := make(chan chan []interfaces.Relatable, 3)
 
 	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
 	go func() {
@@ -93,17 +116,17 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths 
 			if !ok {
 				break
 			}
-			N := 500
-			ochan := make(chan []interfaces.Relatable, 2)
+			N := 400
+			ochan := make(chan []interfaces.Relatable, 10)
 			tochannels <- ochan
 			saved := make([]interfaces.Relatable, N)
-			go func(streams []interfaces.RelatableChannel) {
+			go func(streams []interfaces.RelatableIterator) {
 				j := 0
 
 				for interval := range IRelate(checkOverlap, 0, less, streams...) {
 					saved[j] = interval
 					j += 1
-					if j > 0 && j%N == 0 {
+					if j%N == 0 {
 						ochan <- saved
 						saved = make([]interfaces.Relatable, N)
 						j = 0
@@ -136,7 +159,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths 
 		close(intersected)
 	}()
 
-	A := make([]interfaces.Relatable, 0, chunk+10)
+	A := make([]interfaces.Relatable, 0, chunk+100)
 
 	lastStart := -10
 	lastChrom := ""
@@ -145,7 +168,14 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths 
 
 	go func() {
 
-		for v := range qstream {
+		for {
+			v, err := qstream.Next()
+			if err == io.EOF {
+				qstream.Close()
+			}
+			if v == nil {
+				break
+			}
 			s, e := getStartEnd(v)
 			// end chunk when:
 			// 1. switch chroms
@@ -161,7 +191,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableChannel, paths 
 				}
 				lastStart = int(v.Start())
 				lastChrom, minStart, maxEnd = v.Chrom(), s, e
-				A = make([]interfaces.Relatable, 0, chunk+10)
+				A = make([]interfaces.Relatable, 0, chunk+100)
 			} else {
 				lastStart = int(v.Start())
 				maxEnd = max(e, maxEnd)
