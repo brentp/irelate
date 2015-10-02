@@ -6,8 +6,9 @@ import "strings"
 // RelatableChannel
 type RelatableChannel chan Relatable
 
-type RelatableGetter interface {
-	Next() Relatable
+type RelatableIterator interface {
+	Next() (Relatable, error)
+	Close() error
 }
 
 // IPosition allows accessing positional interface for genomic types.

@@ -2,7 +2,6 @@ package parsers
 
 import (
 	"io"
-	"log"
 
 	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/vcfgo"
@@ -36,18 +35,11 @@ func (v *Variant) Related() []interfaces.Relatable {
 func (v *Variant) SetSource(src uint32) { v.source = src }
 func (v *Variant) Source() uint32       { return v.source }
 
-func Vopen(rdr io.Reader, hdr *vcfgo.Header) *vcfgo.Reader {
-	var vcf *vcfgo.Reader
-	var err error
+func Vopen(rdr io.Reader, hdr *vcfgo.Header) (*vcfgo.Reader, error) {
 	if hdr == nil {
-		vcf, err = vcfgo.NewReader(rdr, true)
-	} else {
-		vcf, err = vcfgo.NewWithHeader(rdr, hdr, true)
+		return vcfgo.NewReader(rdr, true)
 	}
-	if err != nil {
-		log.Fatal(err)
-	}
-	return vcf
+	return vcfgo.NewWithHeader(rdr, hdr, true)
 }
 
 func StreamVCF(vcf *vcfgo.Reader) interfaces.RelatableChannel {
@@ -69,4 +61,24 @@ func StreamVCF(vcf *vcfgo.Reader) interfaces.RelatableChannel {
 		close(ch)
 	}()
 	return ch
+}
+
+type vWrapper struct {
+	*vcfgo.Reader
+}
+
+func (v vWrapper) Next() (interfaces.Relatable, error) {
+	r := v.Read()
+	if r == nil {
+		return nil, io.EOF
+	}
+	return &Variant{r, 0, nil}, nil
+}
+
+func VCFIterator(buf io.Reader) (interfaces.RelatableIterator, error) {
+	v, err := Vopen(buf, nil)
+	if err != nil {
+		return nil, err
+	}
+	return vWrapper{v}, nil
 }

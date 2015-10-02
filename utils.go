@@ -13,6 +13,7 @@ import (
 	"github.com/brentp/bix"
 	"github.com/brentp/irelate/interfaces"
 	"github.com/brentp/irelate/parsers"
+	"github.com/brentp/vcfgo"
 	"github.com/brentp/xopen"
 )
 
@@ -24,6 +25,29 @@ func OpenScanFile(fh io.Reader) (*bufio.Scanner, io.Reader) {
 	scanner := bufio.NewScanner(fh)
 	scanner.Split(bufio.ScanLines)
 	return scanner, fh
+}
+
+type iterable struct {
+	*bufio.Scanner
+	fn func(line []byte) (interfaces.Relatable, error)
+	fh io.Reader
+}
+
+func (it iterable) Next() (interfaces.Relatable, error) {
+	v := it.Bytes()
+	return it.fn(v)
+}
+
+func (it iterable) Close() error {
+	if rc, ok := it.fh.(io.ReadCloser); ok {
+		return rc.Close()
+	}
+	return nil
+}
+
+func ScanToIterator(file io.Reader, fn func(line []byte) (interfaces.Relatable, error)) interfaces.RelatableIterator {
+	scanner, fh := OpenScanFile(file)
+	return iterable{scanner, fn, fh}
 }
 
 // ScanToRelatable makes is easy to create a chan Relatable from a file of intervals.
@@ -107,8 +131,7 @@ func (l location) End() int {
 	return l.end
 }
 
-func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
-	var stream chan interfaces.Relatable
+func getReader(f, region string) (io.Reader, error) {
 	var err error
 
 	var rdr io.Reader
@@ -150,13 +173,43 @@ func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
 	} else {
 		buf = rdr
 	}
+	return buf, nil
+}
+
+func Iterator(f string, region string) (interfaces.RelatableIterator, error) {
+	var iterator interfaces.RelatableIterator
+	buf, err := getReader(f, region)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: gff, bam
+	if strings.HasSuffix(f, ".vcf") || strings.HasSuffix(f, ".vcf.gz") {
+		iterator, err = parsers.VCFIterator(buf)
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		iterator = ScanToIterator(buf, parsers.IntervalFromBedLine)
+	}
+	return iterator, nil
+}
+
+func Streamer(f string, region string) (interfaces.RelatableChannel, error) {
+	var stream chan interfaces.Relatable
+
+	buf, err := getReader(f, region)
+	if err != nil {
+		return nil, err
+	}
 
 	if strings.HasSuffix(f, ".bam") {
 		stream, err = parsers.BamToRelatable(buf)
 	} else if strings.HasSuffix(f, ".gff") {
 		stream, err = parsers.GFFToRelatable(buf)
 	} else if strings.HasSuffix(f, ".vcf") || strings.HasSuffix(f, ".vcf.gz") {
-		v := parsers.Vopen(buf, nil)
+		var v *vcfgo.Reader
+		v, err = parsers.Vopen(buf, nil)
 		stream = parsers.StreamVCF(v)
 	} else {
 		stream = ScanToRelatable(buf, parsers.IntervalFromBedLine)

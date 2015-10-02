@@ -19,8 +19,15 @@ func TestVCF(t *testing.T) {
 		t.Error("couldn't open remote file")
 	}
 
-	g1 := parsers.Vopen(r1, nil)
-	g2 := parsers.Vopen(r2, nil)
+	g1, err := parsers.Vopen(r1, nil)
+	if err != nil {
+		t.Error("couldn't open remote file")
+	}
+
+	g2, err := parsers.Vopen(r2, nil)
+	if err != nil {
+		t.Error("couldn't open remote file")
+	}
 
 	v1 := parsers.StreamVCF(g1)
 	v2 := parsers.StreamVCF(g2)
