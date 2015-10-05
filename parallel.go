@@ -103,17 +103,16 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
 	sem := make(chan int, runtime.GOMAXPROCS(-1))
 
-	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable), ochan chan []interfaces.Relatable,
-		wg *sync.WaitGroup) {
+	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable), wg *sync.WaitGroup) {
 		for _, r := range rels {
 			fn(r)
 		}
-		ochan <- rels
 		wg.Done()
 	}
 
 	// pull the intervals from IRelate, call fn() and  send chunks to be merged.
 	go func() {
+		var fwg sync.WaitGroup
 		for {
 			streams, ok := <-fromchannels
 			if !ok {
@@ -121,38 +120,59 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 			}
 			<-sem
 			N := 200
-			ochan := make(chan []interfaces.Relatable, 3)
-			tochannels <- ochan
+			kMAX := 4
+			// number of intervals stuck at this pahse will be kMAX * N
 
 			saved := make([]interfaces.Relatable, N)
 			go func(streams []interfaces.RelatableIterator) {
+				fwg.Wait()
+				fwg.Add(1)
 				j := 0
 				var wg sync.WaitGroup
+				ochan := make(chan []interfaces.Relatable, kMAX)
+				k := 0
 
 				for interval := range IRelate(checkOverlap, 0, less, streams...) {
 					//fn(interval)
 					saved[j] = interval
 					j += 1
 					if j == N {
-						//ochan <- saved
 						wg.Add(1)
-						go work(saved, fn, ochan, &wg)
+						k += 1
+						// send to channel then modify in parallel, then Wait()
+						// this way we know that the intervals were sent to ochan
+						// in order and we just wait untill all of them are procesessed
+						// before sending to tochannels
+						ochan <- saved
+
+						go work(saved, fn, &wg)
 						saved = make([]interfaces.Relatable, N)
 						j = 0
+					}
+					// only have 4 of these running at once because they are all in memory.
+					if k == kMAX {
+						wg.Wait()
+						tochannels <- ochan
+						ochan = make(chan []interfaces.Relatable, kMAX)
+						k = 0
 					}
 				}
 				if j != 0 {
 					wg.Add(1)
-					go work(saved[:j], fn, ochan, &wg)
-					//ochan <- saved[:j]
+					// send to channel then modify in parallel, then Wait()
+					ochan <- saved[:j]
+					go work(saved[:j], fn, &wg)
 				}
 				wg.Wait()
+				tochannels <- ochan
 				close(ochan)
 				for i := range streams {
 					streams[i].Close()
 				}
+				fwg.Done()
 			}(streams)
 		}
+		fwg.Wait()
 		close(tochannels)
 	}()
 
@@ -222,6 +242,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 			sem <- 1
 			log.Println("XXXXXXXXXXXXXXX ending", len(A), len(fromchannels))
 			makeStreams(fromchannels, A, lastChrom, minStart, maxEnd, paths...)
+			// TODO: block here until it returns so we don't send on closed channel.
 			log.Println("XXXXXXXXXXXXXXX ended")
 		}
 		close(fromchannels)
