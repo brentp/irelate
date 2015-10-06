@@ -63,7 +63,7 @@ func sliceToIterator(A []interfaces.Relatable) interfaces.RelatableIterator {
 }
 
 // make a set of streams ready to be sent to irelate.
-func makeStreams(fromchannels chan []interfaces.RelatableIterator, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) {
+func makeStreams(sem chan int, fromchannels chan []interfaces.RelatableIterator, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) {
 
 	streams := make([]interfaces.RelatableIterator, 0, len(paths)+1)
 	streams = append(streams, sliceToIterator(A))
@@ -78,6 +78,7 @@ func makeStreams(fromchannels chan []interfaces.RelatableIterator, A []interface
 		streams = append(streams, stream)
 	}
 	fromchannels <- streams
+	<-sem
 }
 
 func checkOverlap(a, b interfaces.Relatable) bool {
@@ -101,7 +102,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 	tochannels := make(chan chan []interfaces.Relatable, 8)
 
 	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
-	sem := make(chan int, runtime.GOMAXPROCS(-1)+1)
+	sem := make(chan int, max(runtime.GOMAXPROCS(-1)/2, 1))
 
 	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable), wg *sync.WaitGroup) {
 		for _, r := range rels {
@@ -119,14 +120,13 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 		// outerWg waits for all inner goroutines to finish so we know that w can
 		// close tochannels
 		var outerWg sync.WaitGroup
+		N := 800
+		kMAX := runtime.GOMAXPROCS(-1)
 		for {
 			streams, ok := <-fromchannels
 			if !ok {
 				break
 			}
-			<-sem
-			N := 400
-			kMAX := runtime.GOMAXPROCS(-1)
 			// number of intervals stuck at this pahse will be kMAX * N
 
 			saved := make([]interfaces.Relatable, N)
@@ -229,7 +229,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 			if v.Chrom() != lastChrom || (len(A) > 2048 && int(v.Start())-lastStart > maxGap) || ((int(v.Start())-lastStart > 15 && len(A) >= chunk) || len(A) >= chunk+100) || int(v.Start())-lastStart > 20*maxGap {
 				if len(A) > 0 {
 					sem <- 1
-					go makeStreams(fromchannels, A, lastChrom, minStart, maxEnd, paths...)
+					go makeStreams(sem, fromchannels, A, lastChrom, minStart, maxEnd, paths...)
 					// send work to IRelate
 					log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", v.Chrom(), A[0].Start(), A[len(A)-1].End()), "gap:", int(v.Start())-lastStart)
 					log.Println("\tfromchannels:", len(fromchannels), "tochannels:", len(tochannels), "intersected:", len(intersected))
@@ -250,7 +250,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 		if len(A) > 0 {
 			// TODO: move the semaphare into makestreams to avoid a race with the makestreams call above.
 			sem <- 1
-			makeStreams(fromchannels, A, lastChrom, minStart, maxEnd, paths...)
+			makeStreams(sem, fromchannels, A, lastChrom, minStart, maxEnd, paths...)
+			log.Println(len(sem))
 			// TODO: send to goroutine and block here until it returns so we don't send on closed channel.
 		}
 		close(fromchannels)

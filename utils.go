@@ -136,7 +136,7 @@ func getReader(f, region string) (io.Reader, error) {
 
 	var rdr io.Reader
 	if region != "" {
-		bx, err := bix.New(f, 2)
+		bx, err := bix.New(f, 1)
 		if err != nil {
 			return nil, err
 		}
