@@ -5,24 +5,30 @@ import (
 	"io"
 	"log"
 	"runtime"
+	"sort"
 	"sync"
 
 	"github.com/brentp/irelate/interfaces"
 )
 
-func getStartEnd(v interfaces.Relatable) (int, int) {
-	s, e := int(v.Start()), int(v.End())
+func getStart(v interfaces.Relatable, s int) int {
 	if ci, ok := v.(interfaces.CIFace); ok {
-		a, b, ok := ci.CIEnd()
-		if ok && int(b) > e {
-			e = int(b)
-		}
-		a, b, ok = ci.CIPos()
+		a, _, ok := ci.CIPos()
 		if ok && int(a) < s {
-			s = int(a)
+			return int(a)
 		}
 	}
-	return s, e
+	return s
+}
+
+func getEnd(v interfaces.Relatable, e int) int {
+	if ci, ok := v.(interfaces.CIFace); ok {
+		_, b, ok := ci.CIEnd()
+		if ok && int(b) > e {
+			return int(e)
+		}
+	}
+	return e
 }
 
 func min(a, b int) int {
@@ -62,8 +68,33 @@ func sliceToIterator(A []interfaces.Relatable) interfaces.RelatableIterator {
 	return &sliceIt{A, 0}
 }
 
+// make []interfaces.Relatable sortable.
+type islice []interfaces.Relatable
+
+func (i islice) Len() int {
+	return len(i)
+}
+
+func (i islice) Less(a, b int) bool {
+	if i[a].Start() < i[b].Start() {
+		return true
+	}
+	if i[a].Start() == i[b].Start() && i[a].End() <= i[b].End() {
+		return true
+	}
+	return false
+}
+
+func (is islice) Swap(i, j int) {
+	is[i], is[j] = is[j], is[i]
+}
+
 // make a set of streams ready to be sent to irelate.
-func makeStreams(sem chan int, fromchannels chan []interfaces.RelatableIterator, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) {
+func makeStreams(sem chan int, fromchannels chan []interfaces.RelatableIterator, mustSort bool, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) {
+
+	if mustSort {
+		sort.Sort(islice(A))
+	}
 
 	streams := make([]interfaces.RelatableIterator, 0, len(paths)+1)
 	streams = append(streams, sliceToIterator(A))
@@ -89,8 +120,21 @@ func less(a, b interfaces.Relatable) bool {
 	return a.Start() < b.Start() || (a.Start() == b.Start() && a.End() < b.End())
 }
 
+type ciRel struct {
+	interfaces.Relatable
+	index int
+}
+
+func (ci ciRel) Start() uint32 {
+	return uint32(getStart(ci, int(ci.Relatable.Start())))
+}
+
+func (ci ciRel) End() uint32 {
+	return uint32(getEnd(ci, int(ci.Relatable.End())))
+}
+
 // PIRelate implements a parallel IRelate
-func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn func(interfaces.Relatable), paths ...string) interfaces.RelatableChannel {
+func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExtend bool, fn func(interfaces.Relatable), paths ...string) interfaces.RelatableChannel {
 
 	// final interval stream sent back to caller.
 	intersected := make(chan interfaces.Relatable, 1024)
@@ -109,6 +153,15 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 			fn(r)
 		}
 		wg.Done()
+	}
+	// call on the relatable itself. but with all of the associated intervals.
+	if ciExtend {
+		work = func(rels []interfaces.Relatable, fn func(interfaces.Relatable), wg *sync.WaitGroup) {
+			for _, r := range rels {
+				fn(r.(ciRel).Relatable)
+			}
+			wg.Done()
+		}
 	}
 
 	// pull the intervals from IRelate, call fn() and  send chunks to be merged.
@@ -187,19 +240,53 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 
 	// merge the intervals from different channels keeping order.
 	go func() {
-		for {
-			ch, ok := <-tochannels
-			if !ok {
-				break
-			}
+		// 2 separate function code-blocks so there is no performance hit when they don't
+		// care about the cipos.
+		if ciExtend {
+			// we need to track that the intervals come out in the order they went in
+			// since we sort()'ed them based on the CIPOS.
+			nextPrint := 0
+			q := make(map[int]ciRel, 100)
+			for {
+				ch, ok := <-tochannels
+				if !ok {
+					break
+				}
 
-			for intervals := range ch {
-				for _, interval := range intervals {
-					intersected <- interval
+				for intervals := range ch {
+					for _, interval := range intervals {
+						ci := interval.(ciRel)
+						if ci.index == nextPrint {
+							intersected <- ci.Relatable
+							nextPrint++
+						} else {
+							q[ci.index] = ci
+							for {
+								n, ok := q[nextPrint]
+								if !ok {
+									break
+								}
+								intersected <- n.Relatable
+								nextPrint++
+							}
+						}
+					}
+				}
+			}
+		} else {
+			for {
+				ch, ok := <-tochannels
+				if !ok {
+					break
+				}
+
+				for intervals := range ch {
+					for _, interval := range intervals {
+						intersected <- interval
+					}
 				}
 			}
 		}
-		// wait for all of the sending to finish before we close this channel
 		close(intersected)
 	}()
 
@@ -209,6 +296,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 	lastChrom := ""
 	minStart := int(^uint32(0) >> 1)
 	maxEnd := 0
+	idx := 0
 
 	go func() {
 
@@ -220,25 +308,35 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 			if v == nil {
 				break
 			}
-			s, e := getStartEnd(v)
+
+			if ciExtend {
+				// turn it into an object that will return the ci bounds for Start(), End()
+				v = ciRel{v, idx}
+				idx++
+			}
+
+			// these will be based on CIPOS, CIEND if ciExtend is true
+			s, e := int(v.Start()), int(v.End())
+
 			// end chunk when:
 			// 1. switch chroms
 			// 2. see maxGap bases between adjacent intervals (currently looks at start only)
 			// 3. reaches chunkSize (and has at least a gap of 2 bases from last interval).
-			if v.Chrom() != lastChrom || (len(A) > 2048 && int(v.Start())-lastStart > maxGap) || ((int(v.Start())-lastStart > 15 && len(A) >= chunk) || len(A) >= chunk+100) || int(v.Start())-lastStart > 20*maxGap {
+			if v.Chrom() != lastChrom || (len(A) > 2048 && s-lastStart > maxGap) || ((s-lastStart > 15 && len(A) >= chunk) || len(A) >= chunk+100) || s-lastStart > 20*maxGap {
 				if len(A) > 0 {
 					sem <- 1
-					go makeStreams(sem, fromchannels, A, lastChrom, minStart, maxEnd, paths...)
+					// if ciExtend is true, we have to sort A by the new start which incorporates CIPOS
+					go makeStreams(sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
 					// send work to IRelate
 					log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", v.Chrom(), A[0].Start(), A[len(A)-1].End()), "gap:", int(v.Start())-lastStart)
 					log.Println("\tfromchannels:", len(fromchannels), "tochannels:", len(tochannels), "intersected:", len(intersected))
 
 				}
-				lastStart = int(v.Start())
+				lastStart = s
 				lastChrom, minStart, maxEnd = v.Chrom(), s, e
 				A = make([]interfaces.Relatable, 0, chunk+100)
 			} else {
-				lastStart = int(v.Start())
+				lastStart = s
 				maxEnd = max(e, maxEnd)
 				minStart = min(s, minStart)
 			}
@@ -247,11 +345,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 		}
 
 		if len(A) > 0 {
-			// TODO: move the semaphare into makestreams to avoid a race with the makestreams call above.
 			sem <- 1
-			makeStreams(sem, fromchannels, A, lastChrom, minStart, maxEnd, paths...)
-			log.Println(len(sem))
-			// TODO: send to goroutine and block here until it returns so we don't send on closed channel.
+			makeStreams(sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
 		}
 		close(fromchannels)
 	}()
