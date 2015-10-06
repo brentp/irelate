@@ -140,7 +140,6 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, fn fu
 				k := 0
 
 				for interval := range IRelate(checkOverlap, 0, less, streams...) {
-					//fn(interval)
 					saved[j] = interval
 					j += 1
 					if j == N {
