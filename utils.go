@@ -39,7 +39,7 @@ func (it iterable) Next() (interfaces.Relatable, error) {
 }
 
 func (it iterable) Close() error {
-	if rc, ok := it.fh.(io.ReadCloser); ok {
+	if rc, ok := it.fh.(io.Closer); ok {
 		return rc.Close()
 	}
 	return nil
