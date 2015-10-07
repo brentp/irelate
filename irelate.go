@@ -100,15 +100,16 @@ func filter(s []Relatable, nils int) []Relatable {
 	return s[:j]
 }
 
-// Send the relatables to the channel in sorted order.
-// Check that we couldn't later get an item with a lower start from the current cache.
-func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Relatable, less func(a, b Relatable) bool) {
-	var j int
-	for j = 0; j < len((*sendQ).rels) && (len(cache) == 0 || less((*sendQ).rels[j].(Relatable), cache[0])); j++ {
-	}
-	for i := 0; i < j; i++ {
-		out <- heap.Pop(sendQ).(Relatable)
-	}
+type irelate struct {
+	checkRelated func(a, b Relatable) bool
+	relativeTo   int
+	less         func(a, b Relatable) bool
+	//streams      []RelatableIterator
+	cache       []Relatable
+	sendQ       *relatableQueue
+	mergeStream RelatableIterator
+	//merger RelatableChannel
+	nils int
 }
 
 // IRelate provides the basis for flexible overlap/proximity/k-nearest neighbor
@@ -122,78 +123,92 @@ func sendSortedRelatables(sendQ *relatableQueue, cache []Relatable, out chan Rel
 func IRelate(checkRelated func(a, b Relatable) bool,
 	relativeTo int,
 	less func(a, b Relatable) bool,
-	streams ...RelatableIterator) chan Relatable {
+	streams ...RelatableIterator) RelatableIterator {
 
-	// we infer the chromosome order by the order that we see from source 0.
-	stream := Merge(less, relativeTo, streams...)
-	out := make(chan Relatable, 64)
-	go func() {
+	mergeStream := newMerger(less, relativeTo, streams...)
+	//merger := Merge(less, relativeTo, streams...)
 
-		// use the cache to keep relatables to test against.
-		cache := make([]Relatable, 1, 1024)
-		cache[0] = <-stream
-
-		// Use sendQ to make sure we output in sorted order.
-		// We know we can print something when sendQ.minStart < cache.minStart
-		sendQ := relatableQueue{make([]Relatable, 0, 1024), less}
-		nils := 0
-
-		// TODO:if we know the ends are sorted (in addition to start) then we have some additional
-		// optimizations. As soon as checkRelated is false, then all others in the cache before that
-		// should be true... binary search if endSorted and len(cache) > 20?
-		//endSorted := true
-		for interval := range stream {
-
-			for i, c := range cache {
-				// tried using futures for checkRelated to parallelize... got slower
-				if c == nil {
-					continue
-				}
-				if checkRelated(c, interval) {
-					relate(c, interval, relativeTo)
-				} else {
-					if relativeTo == -1 || int(c.Source()) == relativeTo {
-						heap.Push(&sendQ, c)
-					}
-					cache[i] = nil
-					nils++
-				}
-			}
-
-			// only do this when we have a lot of nils as it's expensive to create a new slice.
-			if nils > 1 {
-				// remove nils from the cache (must do this before sending)
-				cache, nils = filter(cache, nils), 0
-				// send the elements from cache in order.
-				// use heuristic to minimize the sending.
-				if len(sendQ.rels) > 8 {
-					sendSortedRelatables(&sendQ, cache, out, less)
-				}
-			}
-			cache = append(cache, interval)
-
-		}
-		for _, c := range filter(cache, nils) {
-			if int(c.Source()) == relativeTo || relativeTo == -1 {
-				heap.Push(&sendQ, c)
-			}
-		}
-		for i := 0; i < len(sendQ.rels); i++ {
-			out <- sendQ.rels[i]
-		}
-		close(out)
-	}()
-	return out
+	ir := &irelate{checkRelated: checkRelated, relativeTo: relativeTo,
+		mergeStream: mergeStream,
+		//merger: merger,
+		cache: make([]Relatable, 0, 1024), sendQ: &relatableQueue{make([]Relatable, 0, 1024), less},
+		less: less}
+	return ir
 }
 
-// Merge accepts channels of Relatables and merges them in order.
-// Streams of Relatable's from different source must be merged to send
-// to IRelate.
-// This uses a priority queue and acts like python's heapq.merge.
-func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableIterator) RelatableChannel {
-	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
+func (ir *irelate) Close() error {
+	return nil
+}
+
+func (ir *irelate) Next() (Relatable, error) {
+
+	for {
+		interval, err := ir.mergeStream.Next()
+		if err == io.EOF {
+			break
+		}
+		for i, c := range ir.cache {
+			// tried using futures for checkRelated to parallelize... got slower
+			if c == nil {
+				continue
+			}
+			if ir.checkRelated(c, interval) {
+				relate(c, interval, ir.relativeTo)
+			} else {
+				if ir.relativeTo == -1 || int(c.Source()) == ir.relativeTo {
+					heap.Push(ir.sendQ, c)
+				}
+				ir.cache[i] = nil
+				ir.nils++
+			}
+		}
+
+		// only do this when we have a lot of nils as it's expensive to create a new slice.
+		if ir.nils > 0 {
+			// remove nils from the cache (must do this before sending)
+			ir.cache, ir.nils = filter(ir.cache, ir.nils), 0
+			var o Relatable
+			if len(ir.sendQ.rels) > 0 {
+				o = ir.sendQ.rels[0]
+			} else {
+				o = nil
+			}
+			if o != nil && (len(ir.cache) == 0 || ir.less(o, ir.cache[0])) {
+				ir.cache = append(ir.cache, interval)
+				return heap.Pop(ir.sendQ).(Relatable), nil
+			}
+		}
+		ir.cache = append(ir.cache, interval)
+	}
+	if len(ir.cache) > 0 {
+		for _, c := range ir.cache {
+			if ir.relativeTo == -1 || int(c.Source()) == ir.relativeTo {
+				heap.Push(ir.sendQ, c)
+			}
+		}
+		ir.cache = ir.cache[:0]
+	}
+	if len(ir.sendQ.rels) > 0 {
+		return heap.Pop(ir.sendQ).(Relatable), nil
+	}
+	return nil, io.EOF
+}
+
+type merger struct {
+	less       func(a, b Relatable) bool
+	relativeTo int
+	streams    []RelatableIterator
+	q          relatableQueue
+	seen       map[string]struct{}
+	j          int
+	lastChrom  string
+	verbose    bool
+}
+
+func newMerger(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableIterator) *merger {
 	q := relatableQueue{make([]Relatable, 0, len(streams)), less}
-	seen := make(map[string]struct{})
+	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
+
 	for i, stream := range streams {
 		interval, err := stream.Next()
 		if interval != nil {
@@ -204,55 +219,55 @@ func Merge(less func(a, b Relatable) bool, relativeTo int, streams ...RelatableI
 			stream.Close()
 		}
 	}
+	m := &merger{less: less, relativeTo: relativeTo, streams: streams, q: q, seen: make(map[string]struct{}), j: -1000, lastChrom: "", verbose: verbose}
 
-	ch := make(chan Relatable, 8)
-	go func() {
-		var interval Relatable
-		sentinel := struct{}{}
-		lastChrom := ""
-		// heuristic to use this to stop when end of query records is reached.
-		j := -1000
-		for len(q.rels) > 0 {
-			interval = heap.Pop(&q).(Relatable)
-			source := interval.Source()
-			ch <- interval
-			if !SameChrom(interval.Chrom(), lastChrom) {
-				lastChrom = StripChr(interval.Chrom())
-				if _, ok := seen[lastChrom]; ok {
-					log.Println("warning: chromosomes must be in different order between files or the chromosome sort order is not as expected.")
-					log.Printf("warning: overlaps will likely be missed after this chrom: %s from source: %d\n", lastChrom, interval.Source())
-				}
-				seen[lastChrom] = sentinel
-				if verbose {
-					log.Printf("on chromosome: %s\n", lastChrom)
-				}
-			}
-			// pull the next interval from the same source.
-			next_interval, err := streams[source].Next()
-			if err == nil {
-				if next_interval.Start() < interval.Start() {
-					if SameChrom(next_interval.Chrom(), interval.Chrom()) {
-						panic(fmt.Sprintf("intervals out of order within file: starts at: %d and %d from source: %d", interval.Start(), next_interval.Start(), source))
-					}
-				}
-				next_interval.SetSource(source)
-				heap.Push(&q, next_interval)
-				j--
-				if j == 0 {
-					break
-				}
-			} else {
-				if int(source) == relativeTo {
-					// we pull in 200K more records and then stop. to make sure we get anything that might
-					// relate to last query
-					j = 200000
-				}
-			}
-			if err == io.EOF {
-				streams[source].Close()
+	return m
+}
+
+func (m *merger) Close() error {
+	return nil
+}
+
+func (m *merger) Next() (Relatable, error) {
+	if len(m.q.rels) == 0 {
+		return nil, io.EOF
+	}
+	interval := heap.Pop(&m.q).(Relatable)
+	source := interval.Source()
+	if !SameChrom(interval.Chrom(), m.lastChrom) {
+		m.lastChrom = StripChr(interval.Chrom())
+		if _, ok := m.seen[m.lastChrom]; ok {
+			log.Println("warning: chromosomes must be in different order between files or the chromosome sort order is not as expected.")
+			log.Printf("warning: overlaps will likely be missed after this chrom: %s from source: %d\n", m.lastChrom, interval.Source())
+		}
+		m.seen[m.lastChrom] = struct{}{}
+		if m.verbose {
+			log.Printf("on chromosome: %s\n", m.lastChrom)
+		}
+	}
+	// pull the next interval from the same source.
+	next_interval, err := m.streams[source].Next()
+	if err == nil {
+		if next_interval.Start() < interval.Start() {
+			if SameChrom(next_interval.Chrom(), interval.Chrom()) {
+				panic(fmt.Sprintf("intervals out of order within file: starts at: %d and %d from source: %d", interval.Start(), next_interval.Start(), source))
 			}
 		}
-		close(ch)
-	}()
-	return ch
+		next_interval.SetSource(source)
+		heap.Push(&m.q, next_interval)
+		m.j--
+		if m.j == 0 {
+			return nil, io.EOF
+		}
+	} else {
+		if int(source) == m.relativeTo {
+			// we pull in 200K more records and then stop. to make sure we get anything that might
+			// relate to last query
+			m.j = 200000
+		}
+	}
+	if err == io.EOF {
+		m.streams[source].Close()
+	}
+	return interval, nil
 }

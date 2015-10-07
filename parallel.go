@@ -90,7 +90,7 @@ func (is islice) Swap(i, j int) {
 }
 
 // make a set of streams ready to be sent to irelate.
-func makeStreams(sem chan int, fromchannels chan []interfaces.RelatableIterator, mustSort bool, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) {
+func makeStreams(fromWg *sync.WaitGroup, sem chan int, fromchannels chan []interfaces.RelatableIterator, mustSort bool, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) {
 
 	if mustSort {
 		sort.Sort(islice(A))
@@ -110,6 +110,7 @@ func makeStreams(sem chan int, fromchannels chan []interfaces.RelatableIterator,
 	}
 	fromchannels <- streams
 	<-sem
+	fromWg.Done()
 }
 
 func checkOverlap(a, b interfaces.Relatable) bool {
@@ -192,7 +193,14 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 				ochan := make(chan []interfaces.Relatable, kMAX)
 				k := 0
 
-				for interval := range IRelate(checkOverlap, 0, less, streams...) {
+				iterator := IRelate(checkOverlap, 0, less, streams...)
+
+				//for interval := range IRelate(checkOverlap, 0, less, streams...) {
+				for {
+					interval, err := iterator.Next()
+					if err == io.EOF {
+						break
+					}
 					saved[j] = interval
 					j += 1
 					if j == N {
@@ -300,6 +308,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 
 	go func() {
 
+		var fromWg sync.WaitGroup
 		for {
 			v, err := qstream.Next()
 			if err == io.EOF {
@@ -326,7 +335,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 				if len(A) > 0 {
 					sem <- 1
 					// if ciExtend is true, we have to sort A by the new start which incorporates CIPOS
-					go makeStreams(sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
+					fromWg.Add(1)
+					go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
 					// send work to IRelate
 					log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", v.Chrom(), A[0].Start(), A[len(A)-1].End()), "gap:", int(v.Start())-lastStart)
 					log.Println("\tfromchannels:", len(fromchannels), "tochannels:", len(tochannels), "intersected:", len(intersected))
@@ -346,8 +356,10 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 
 		if len(A) > 0 {
 			sem <- 1
-			makeStreams(sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
+			fromWg.Add(1)
+			makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
 		}
+		fromWg.Wait()
 		close(fromchannels)
 	}()
 
