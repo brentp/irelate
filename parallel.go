@@ -274,11 +274,22 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 								if !ok {
 									break
 								}
+								delete(q, nextPrint)
 								intersected <- n.Relatable
 								nextPrint++
 							}
 						}
 					}
+				}
+				// empty out the q
+				for {
+					n, ok := q[nextPrint]
+					if !ok {
+						break
+					}
+					delete(q, nextPrint)
+					intersected <- n.Relatable
+					nextPrint++
 				}
 			}
 		} else {
@@ -309,6 +320,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	go func() {
 
 		var fromWg sync.WaitGroup
+		c := 0
 		for {
 			v, err := qstream.Next()
 			if err == io.EOF {
@@ -337,9 +349,10 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 					// if ciExtend is true, we have to sort A by the new start which incorporates CIPOS
 					fromWg.Add(1)
 					go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
+					c++
 					// send work to IRelate
-					log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", v.Chrom(), A[0].Start(), A[len(A)-1].End()), "gap:", int(v.Start())-lastStart)
-					log.Println("\tfromchannels:", len(fromchannels), "tochannels:", len(tochannels), "intersected:", len(intersected))
+					log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", lastChrom, minStart, maxEnd), "gap:", s-lastStart)
+					log.Println("\tc:", c, "fromchannels:", len(fromchannels), "tochannels:", len(tochannels), "intersected:", len(intersected))
 
 				}
 				lastStart = s
@@ -357,7 +370,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		if len(A) > 0 {
 			sem <- 1
 			fromWg.Add(1)
-			makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
+			go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
+			c++
 		}
 		fromWg.Wait()
 		close(fromchannels)
