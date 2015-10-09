@@ -2,7 +2,6 @@ package parsers
 
 import (
 	"bytes"
-	"log"
 	"strconv"
 	"unsafe"
 
@@ -59,9 +58,6 @@ func IntervalFromBedLine(line []byte) (interfaces.Relatable, error) {
 	end, err := strconv.ParseUint(unsafeString(fields[2]), 10, 32)
 	if err != nil {
 		return nil, err
-	}
-	if start == 85558 {
-		log.Fatal("line:", string(line))
 	}
 	i := Interval{chrom: string(fields[0]), start: uint32(start), end: uint32(end), related: nil, Fields: fields}
 	return &i, nil
