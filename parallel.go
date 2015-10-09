@@ -89,20 +89,34 @@ func (is islice) Swap(i, j int) {
 	is[i], is[j] = is[j], is[i]
 }
 
+type pos struct {
+	chrom string
+	start int
+	end   int
+}
+
+func (p pos) Chrom() string {
+	return p.chrom
+}
+func (p pos) Start() uint32 {
+	return uint32(p.start)
+}
+func (p pos) End() uint32 {
+	return uint32(p.end)
+}
+
 // make a set of streams ready to be sent to irelate.
-func makeStreams(fromWg *sync.WaitGroup, sem chan int, fromchannels chan []interfaces.RelatableIterator, mustSort bool, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, paths ...string) {
+func makeStreams(fromWg *sync.WaitGroup, sem chan int, fromchannels chan []interfaces.RelatableIterator, mustSort bool, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, dbs ...interfaces.Queryable) {
 
 	if mustSort {
 		sort.Sort(islice(A))
 	}
 
-	streams := make([]interfaces.RelatableIterator, 0, len(paths)+1)
+	streams := make([]interfaces.RelatableIterator, 0, len(dbs)+1)
 	streams = append(streams, sliceToIterator(A))
 
-	region := fmt.Sprintf("%s:%d-%d", lastChrom, minStart, maxEnd)
-
-	for _, path := range paths {
-		stream, err := Iterator(path, region)
+	for _, db := range dbs {
+		stream, err := db.Query(pos{lastChrom, minStart, maxEnd})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -135,7 +149,7 @@ func (ci ciRel) End() uint32 {
 }
 
 // PIRelate implements a parallel IRelate
-func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExtend bool, fn func(interfaces.Relatable), paths ...string) interfaces.RelatableChannel {
+func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExtend bool, fn func(interfaces.Relatable), dbs ...interfaces.Queryable) interfaces.RelatableChannel {
 
 	// final interval stream sent back to caller.
 	intersected := make(chan interfaces.Relatable, 1024)
@@ -348,7 +362,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 					sem <- 1
 					// if ciExtend is true, we have to sort A by the new start which incorporates CIPOS
 					fromWg.Add(1)
-					go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
+					go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
 					c++
 					// send work to IRelate
 					log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", lastChrom, minStart, maxEnd), "gap:", s-lastStart)
@@ -370,7 +384,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		if len(A) > 0 {
 			sem <- 1
 			fromWg.Add(1)
-			go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, paths...)
+			go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
 			c++
 		}
 		fromWg.Wait()

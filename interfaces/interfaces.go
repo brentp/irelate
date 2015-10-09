@@ -11,6 +11,12 @@ type RelatableIterator interface {
 	Close() error
 }
 
+// Queryable allows querying by genomic position. Anything that meets this interface
+// can be used in irelate.
+type Queryable interface {
+	Query(region IPosition) (RelatableIterator, error)
+}
+
 // IPosition allows accessing positional interface for genomic types.
 type IPosition interface {
 	Chrom() string
@@ -18,19 +24,10 @@ type IPosition interface {
 	End() uint32
 }
 
-type RandomGetter interface {
-	Get(query IPosition) []IPosition
-}
-
 // Interface to get the CIPos and CIEND from a VCF. Returns start, end, ok.
 type CIFace interface {
 	CIPos() (uint32, uint32, bool)
 	CIEnd() (uint32, uint32, bool)
-}
-
-// A RandomChannel accepts a single IPosition and returns a slice of all overlapping positions.
-type RandomChannel interface {
-	Relate(chan IPosition) chan []IPosition
 }
 
 // Relatable provides all the methods for irelate to function.
@@ -64,6 +61,71 @@ type IVariant interface {
 	Info() Info
 	Id() string
 	String() string
+}
+
+type SIPosition interface {
+	IPosition
+	String() string
+}
+
+// trun an IPosition into an IRelatalbe
+type RelWrap struct {
+	related []Relatable
+	source  uint32
+}
+
+func (w *RelWrap) Source() uint32 {
+	return w.source
+}
+func (w *RelWrap) SetSource(s uint32) {
+	w.source = s
+}
+func (w *RelWrap) AddRelated(r Relatable) {
+	if w.related == nil {
+		w.related = make([]Relatable, 0, 2)
+	}
+	w.related = append(w.related, r)
+}
+
+func (w *RelWrap) Related() []Relatable {
+	return w.related
+}
+
+type VarWrap struct {
+	IVariant
+	*RelWrap
+}
+type PosWrap struct {
+	SIPosition
+	*RelWrap
+}
+
+// turn a position thingy into a Relatable
+func AsRelatable(p SIPosition) Relatable {
+	if v, ok := p.(IVariant); ok {
+		return VarWrap{IVariant: v, RelWrap: &RelWrap{}}
+	}
+	return &PosWrap{SIPosition: p, RelWrap: &RelWrap{}}
+}
+
+type ip struct {
+	chrom string
+	start uint32
+	end   uint32
+}
+
+func (p ip) Chrom() string {
+	return p.chrom
+}
+func (p ip) Start() uint32 {
+	return p.start
+}
+func (p ip) End() uint32 {
+	return p.end
+}
+
+func AsIPosition(chrom string, start int, end int) IPosition {
+	return ip{chrom, uint32(start), uint32(end)}
 }
 
 func SameChrom(a, b string) bool {
