@@ -191,7 +191,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		// outerWg waits for all inner goroutines to finish so we know that w can
 		// close tochannels
 		var outerWg sync.WaitGroup
-		N := 800
+		N := 1200
 		kMAX := runtime.GOMAXPROCS(-1)
 		for {
 			streams, ok := <-fromchannels
@@ -204,7 +204,6 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 			outerWg.Add(1)
 			fwg.Wait()
 			go func(streams []interfaces.RelatableIterator) {
-				fwg.Add(1)
 				j := 0
 				var wg sync.WaitGroup
 				ochan := make(chan []interfaces.Relatable, kMAX)
@@ -212,7 +211,6 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 
 				iterator := IRelate(checkOverlap, 0, less, streams...)
 
-				//for interval := range IRelate(checkOverlap, 0, less, streams...) {
 				for {
 					interval, err := iterator.Next()
 					if err == io.EOF {
@@ -258,6 +256,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 				}
 				outerWg.Done()
 			}(streams)
+			fwg.Add(1)
 		}
 		outerWg.Wait()
 		close(tochannels)
