@@ -151,11 +151,12 @@ func (ci ciRel) End() uint32 {
 
 // PIRelate implements a parallel IRelate
 func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExtend bool, fn func(interfaces.Relatable), dbs ...interfaces.Queryable) interfaces.RelatableChannel {
+	nprocs := runtime.GOMAXPROCS(-1)
 
 	// final interval stream sent back to caller.
 	intersected := make(chan interfaces.Relatable, 1024)
 	// fromchannels receives lists of relatables ready to be sent to IRelate
-	fromchannels := make(chan []interfaces.RelatableIterator, 8)
+	fromchannels := make(chan []interfaces.RelatableIterator, 4)
 
 	// to channels recieves channels to accept intervals from IRelate to be sent for merging.
 	// we send slices of intervals to reduce locking.
@@ -164,7 +165,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
 
 	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
-	sem := make(chan int, max(runtime.GOMAXPROCS(-1)/2, 1))
+	sem := make(chan int, max(nprocs/2, 1))
 
 	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable), wg *sync.WaitGroup) {
 		for _, r := range rels {
@@ -187,7 +188,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		// fwg keeps the work from the internal goroutines synchronized.
 		// so that the intervals are sent in order.
 
-		var fwg sync.WaitGroup
+		//var fwg sync.WaitGroup
+
 		// outerWg waits for all inner goroutines to finish so we know that w can
 		// close tochannels
 		var outerWg sync.WaitGroup
@@ -202,7 +204,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 
 			saved := make([]interfaces.Relatable, N)
 			outerWg.Add(1)
-			fwg.Wait()
+			//fwg.Wait()
 			go func(streams []interfaces.RelatableIterator) {
 				j := 0
 				var wg sync.WaitGroup
@@ -250,13 +252,13 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 				wg.Wait()
 				tochannels <- ochan
 				close(ochan)
-				fwg.Done()
+				//fwg.Done()
 				for i := range streams {
 					streams[i].Close()
 				}
 				outerWg.Done()
 			}(streams)
-			fwg.Add(1)
+			//fwg.Add(1)
 		}
 		outerWg.Wait()
 		close(tochannels)
@@ -359,7 +361,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 			// 1. switch chroms
 			// 2. see maxGap bases between adjacent intervals (currently looks at start only)
 			// 3. reaches chunkSize (and has at least a gap of 2 bases from last interval).
-			if v.Chrom() != lastChrom || (len(A) > 2048 && s-lastStart > maxGap) || ((s-lastStart > 15 && len(A) >= chunk) || len(A) >= chunk+100) || s-lastStart > 20*maxGap {
+			if v.Chrom() != lastChrom || (len(A) > 2048 && s-lastStart > maxGap) || ((s-lastStart > 25 && len(A) >= chunk) || len(A) >= chunk+100) || s-lastStart > 20*maxGap {
 				if len(A) > 0 {
 					sem <- 1
 					// if ciExtend is true, we have to sort A by the new start which incorporates CIPOS
