@@ -202,8 +202,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 
 			saved := make([]interfaces.Relatable, N)
 			outerWg.Add(1)
+			fwg.Wait()
 			go func(streams []interfaces.RelatableIterator) {
-				fwg.Wait()
 				fwg.Add(1)
 				j := 0
 				var wg sync.WaitGroup
@@ -252,10 +252,10 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 				wg.Wait()
 				tochannels <- ochan
 				close(ochan)
+				fwg.Done()
 				for i := range streams {
 					streams[i].Close()
 				}
-				fwg.Done()
 				outerWg.Done()
 			}(streams)
 		}
