@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"runtime"
 	"sort"
 	"sync"
@@ -159,6 +160,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	// to channels recieves channels to accept intervals from IRelate to be sent for merging.
 	// we send slices of intervals to reduce locking.
 	tochannels := make(chan chan []interfaces.Relatable, 8)
+
+	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
 
 	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
 	sem := make(chan int, max(runtime.GOMAXPROCS(-1)/2, 1))
@@ -365,8 +368,10 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 					go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
 					c++
 					// send work to IRelate
-					log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", lastChrom, minStart, maxEnd), "gap:", s-lastStart)
-					log.Println("\tc:", c, "fromchannels:", len(fromchannels), "tochannels:", len(tochannels), "intersected:", len(intersected))
+					if verbose {
+						log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", lastChrom, minStart, maxEnd), "gap:", s-lastStart)
+						log.Println("\tc:", c, "fromchannels:", len(fromchannels), "tochannels:", len(tochannels), "intersected:", len(intersected))
+					}
 
 				}
 				lastStart = s
