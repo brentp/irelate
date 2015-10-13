@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"runtime/pprof"
 	"syscall"
 
+	"github.com/brentp/bix"
 	"github.com/brentp/irelate"
 	I "github.com/brentp/irelate/interfaces"
 )
@@ -27,6 +27,13 @@ func init() {
 		}
 	}()
 }
+
+func check(e error) {
+	if e != nil {
+		log.Fatal(e)
+	}
+}
+
 func main() {
 	f, err := os.Create("irelate.cpu.pprof")
 	if err != nil {
@@ -36,43 +43,22 @@ func main() {
 	defer pprof.StopCPUProfile()
 	files := os.Args[1:]
 	buf := bufio.NewWriter(os.Stdout)
-	for interval := range irelate.PIRelate(80000, 25000, "", files[0], files[1:]...) {
-		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
-	}
-	buf.Flush()
-}
+	b, err := bix.New(files[0], 1)
+	check(err)
+	bx, err := b.Query(nil)
+	check(err)
 
-func main0() {
-
-	cpuProfile := flag.Bool("cpuProfile", false, "perform CPU profiling")
-	flag.Parse()
-	files := flag.Args()
-
-	streams := make([]I.RelatableChannel, 0)
-	for _, f := range files {
-		// Streamer automatically returns a Relatalbe Channel for bam/gff/bed(.gz)
-		log.Println(f)
-		s, _ := irelate.Streamer(f, "")
-		streams = append(streams, s)
-	}
-
-	if *cpuProfile {
-		f, err := os.Create("irelate.cpu.pprof")
+	queryables := make([]I.Queryable, len(files)-1)
+	for i, f := range files[1:] {
+		q, err := bix.New(f, 1)
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
+		queryables[i] = q
 	}
 
-	buf := bufio.NewWriter(os.Stdout)
-
-	//for interval := range I.IRelate(merged, I.CheckRelatedByOverlap) {
-	for interval := range irelate.IRelate(irelate.CheckRelatedByOverlap, 0, irelate.Less, streams...) {
-		// for bam output:
-		// bam := *(interval).(*I.Bam)
+	for interval := range irelate.PIRelate(80000, 25000, bx, false, func(a I.Relatable) {}, queryables...) {
 		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
-
 	}
 	buf.Flush()
 }
