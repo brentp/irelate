@@ -119,19 +119,17 @@ type irelate struct {
 // is true since they may have the same start). Once checkRelated returns false,
 // it is assumed that no other `b` Relatables could possibly be related to `a`
 // and so `a` is sent to the returnQ.
-// streams are a variable number of channels that send intervals.
+// streams are a variable number of iterators that send intervals.
 func IRelate(checkRelated func(a, b Relatable) bool,
 	relativeTo int,
 	less func(a, b Relatable) bool,
 	streams ...RelatableIterator) RelatableIterator {
 
 	mergeStream := newMerger(less, relativeTo, streams...)
-	//merger := Merge(less, relativeTo, streams...)
 
 	ir := &irelate{checkRelated: checkRelated, relativeTo: relativeTo,
 		mergeStream: mergeStream,
-		//merger: merger,
-		cache: make([]Relatable, 0, 1024), sendQ: &relatableQueue{make([]Relatable, 0, 1024), less},
+		cache:       make([]Relatable, 0, 1024), sendQ: &relatableQueue{make([]Relatable, 0, 1024), less},
 		less: less}
 	return ir
 }
@@ -148,7 +146,6 @@ func (ir *irelate) Next() (Relatable, error) {
 			break
 		}
 		for i, c := range ir.cache {
-			// tried using futures for checkRelated to parallelize... got slower
 			if c == nil {
 				continue
 			}
@@ -235,15 +232,15 @@ func (m *merger) Next() (Relatable, error) {
 	interval := heap.Pop(&m.q).(Relatable)
 	source := interval.Source()
 	if !SameChrom(interval.Chrom(), m.lastChrom) {
+		if m.verbose && m.lastChrom != "" {
+			log.Printf("on chromosome: %s\n", m.lastChrom)
+		}
 		m.lastChrom = StripChr(interval.Chrom())
 		if _, ok := m.seen[m.lastChrom]; ok {
 			log.Println("warning: chromosomes must be in different order between files or the chromosome sort order is not as expected.")
 			log.Printf("warning: overlaps will likely be missed after this chrom: %s from source: %d\n", m.lastChrom, interval.Source())
 		}
 		m.seen[m.lastChrom] = struct{}{}
-		if m.verbose {
-			log.Printf("on chromosome: %s\n", m.lastChrom)
-		}
 	}
 	// pull the next interval from the same source.
 	next_interval, err := m.streams[source].Next()

@@ -6,8 +6,10 @@ Streaming relation (overlap, distance, KNN) testing of (any number of) sorted fi
 Currently supports BED, BAM, GFF, VCF.
 
 [![GoDoc] (https://godoc.org/github.com/brentp/irelate?status.png)](https://godoc.org/github.com/brentp/irelate)
+<!--
 [![Build Status](https://travis-ci.org/brentp/irelate.svg?branch=master)](https://travis-ci.org/brentp/irelate)
 [![Coverage Status](https://coveralls.io/repos/brentp/irelate/badge.svg?branch=master)](https://coveralls.io/r/brentp/irelate?branch=master)
+-->
 
 Motivation
 ----------
@@ -26,6 +28,8 @@ Design
   to perform overlap testing.
 + i.Related() gives access to all of the related intervals (after they are added internally by `IRelate`)
 + the "API" is a for loop
++ A parallel chrom-sweep algorithm is used that avoids problems with chromosome order and parallelizes nicely
+  up to about a dozen CPUs.
 
 Example
 -------
@@ -54,8 +58,8 @@ func Less(a Relatable, b Relatable) bool {
 
 
 // a and b are channels that send Relatables.
-a, _ := ScanToRelatable('intervals.bed', IntervalFromBedLine)
-b, _ := BamToRelatable('some.bam')
+a, _ := bix.New('intervals.bed.gz')
+b, _ := bix.New('some.vcf.gz')
 for interval := range IRelate(CheckRelatedByOverlap, 0, Less, a, b) {
     fmt.Fprintf("%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 }
@@ -66,14 +70,14 @@ only intervals from `a` (the 0th) source will be sent from IRelate. If this is s
 all intervals from all sources will be sent. After this, any number of interval streams
 can be passed to `IRelate`
 
-If we only want to count alignments with a given mapping quality, the loop becomes:
+If we only want to count variants with a given mapping quality, the loop becomes:
 
 ```go
 for interval := range IRelate(CheckRelatedByOverlap, 0, Less, a, b) {
     n := 0
     for _, b := range interval.Related() {
          // cast to a bam to ge the mapping quality.
-         if int(b.(*Bam).Score()) > 20 {
+         if int(b.(*Variant).Score()) > 20 {
              n += 1
          }
     }
@@ -84,7 +88,8 @@ for interval := range IRelate(CheckRelatedByOverlap, 0, Less, a, b) {
 ```
 
 *note* that *any number* of interval sources are supported even though the example is with 2.
-We can see the source of each interval with: `interval.Source()`. That value is set automatically in `Merge`.
+We can see the source of each interval with: `interval.Source()`. That value is set automatically inside
+of irelate.
 
 
 This is a very simple example, but the point of this is that since the interface is a simple function (as in
@@ -107,7 +112,7 @@ simple.
 Relatable
 ---------
 
-the only interface in *irelated* is:
+a key interface in *irelated* is:
 
 ```go
 // Relatable provides all the methods for irelate to function.
@@ -128,29 +133,6 @@ type Relatable interface {
 Performance
 -----------
 
-There has been little done in the way of optimizations. Currently, *irelate* is within ~3X of
-BEDTools. With a large number of files, it gets closer because *irelate* parses the files
-concurrently.
-
-```Shell
-$ zless $A | wc -l
-1572178
-$ zless $B | wc -l
-31739
-
-$ time bedtools intersect -sorted -a $A -b $B -u -sortout | wc -l
-792339
-
-real 1.486s
-user 1.488s
-sys  0.048s
-
-$ GOMAXPROCS=2 time ./relate $A $B | wc -l
-792339
-
-real 5.214s
-user 5.164s
-sys  0.144s
-```
-More benefit is seen when one or more of the files is a BAM file.
-
+irelate is quite fast, but use PIRelate for parallel intersection. It is less flexible
+than irelate, but skips parsing of database intervals for sparse regions in the query.
+In addition, it has very good (automatic) parallelization.

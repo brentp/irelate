@@ -3,31 +3,33 @@ package irelate
 import (
 	"testing"
 
+	"github.com/brentp/bix"
 	"github.com/brentp/irelate/interfaces"
 )
 
 func benchmarkStreams(nStreams int, b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
-		streams := make([]interfaces.RelatableChannel, 0)
+		streams := make([]interfaces.RelatableIterator, 0)
 		f := "data/test.bed.gz"
 
 		for i := 0; i < nStreams; i++ {
-			s, e := Streamer(f, "")
+			s, e := bix.New(f)
 			if e != nil {
 				panic(e)
 			}
-			streams = append(streams, s)
+			q, e := s.Query(nil)
+			streams = append(streams, q)
 		}
-		b, e := Streamer("data/ex.bam", "")
-		if e != nil {
-			panic(e)
-		}
-		streams = append(streams, b)
 
 		//for a := range IRelate(CheckRelatedByOverlap, 0, Less, streams...) {
-		for a := range IRelate(CheckOverlapPrefix, 0, LessPrefix, streams...) {
-			a.Start()
+		iter := IRelate(CheckOverlapPrefix, 0, LessPrefix, streams...)
+		for {
+			a, err := iter.Next()
+			if err != nil {
+				break
+				a.Start()
+			}
 		}
 
 	}
