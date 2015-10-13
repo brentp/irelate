@@ -1,4 +1,5 @@
-// Streaming relation (overlap, distance, KNN) testing of (any number of) sorted files of intervals.
+// interfaces for genomic relations
+// irelate operates on "Relatable"s which keep a slice of related intervals.
 package interfaces
 
 import "strings"
@@ -6,6 +7,7 @@ import "strings"
 // RelatableChannel
 type RelatableChannel chan Relatable
 
+// RelatableIterator provides a method to iterate over Relatables
 type RelatableIterator interface {
 	Next() (Relatable, error)
 	Close() error
@@ -31,7 +33,7 @@ type CIFace interface {
 }
 
 // Relatable provides all the methods for irelate to function.
-// See Interval in interval.go for a class that satisfies this interface.
+// See Interval in parsers/interval.go for a class that satisfies this interface.
 // Related() likely returns and AddRelated() likely appends to a slice of
 // relatables. Note that for performance reasons, Relatable should be implemented
 // as a pointer to your data-structure (see Interval).
@@ -53,11 +55,16 @@ type Info interface {
 	Bytes() []byte
 }
 
-// IVariant must implement IPosition as well as Ref, Alt, and Inof() methods for genetic variants
-type IVariant interface {
+// IRefAlt will force matching on the Ref and Alt fields when they are present.
+type IRefAlt interface {
 	IPosition
 	Ref() string
 	Alt() []string
+}
+
+// IVariant must implement IPosition, Ref, Alt, and Info() methods for genetic variants
+type IVariant interface {
+	IRefAlt
 	Info() Info
 	Id() string
 	String() string
@@ -95,8 +102,14 @@ type VarWrap struct {
 	IVariant
 	*RelWrap
 }
+
 type PosWrap struct {
 	SIPosition
+	*RelWrap
+}
+
+type RAWrap struct {
+	IRefAlt
 	*RelWrap
 }
 
@@ -104,6 +117,9 @@ type PosWrap struct {
 func AsRelatable(p SIPosition) Relatable {
 	if v, ok := p.(IVariant); ok {
 		return VarWrap{IVariant: v, RelWrap: &RelWrap{}}
+	}
+	if v, ok := p.(IRefAlt); ok {
+		return &RAWrap{IRefAlt: v, RelWrap: &RelWrap{}}
 	}
 	return &PosWrap{SIPosition: p, RelWrap: &RelWrap{}}
 }
@@ -124,10 +140,12 @@ func (p ip) End() uint32 {
 	return p.end
 }
 
+// AsIPosition take chrom, start, end and returns an struct that meets the IPosition interface
 func AsIPosition(chrom string, start int, end int) IPosition {
 	return ip{chrom, uint32(start), uint32(end)}
 }
 
+// SameChrom returns true if the strings are the same chromosome. Adjust for "chr" prefix.
 func SameChrom(a, b string) bool {
 	if a == b {
 		return true
@@ -135,6 +153,7 @@ func SameChrom(a, b string) bool {
 	return StripChr(a) == StripChr(b)
 }
 
+// StripChr removes the "chr" prefix if it is present
 func StripChr(c string) string {
 	if strings.HasPrefix(c, "chr") {
 		return c[3:]
@@ -142,15 +161,18 @@ func StripChr(c string) string {
 	return c
 }
 
+// SamePosition tests if 2 IPositions are the same
 func SamePosition(a, b IPosition) bool {
 	return a.Start() == b.Start() && a.End() == b.End() && SameChrom(a.Chrom(), b.Chrom())
 }
 
+// SamePosition tests if 2 IPositions overlap
 func OverlapsPosition(a, b IPosition) bool {
 	return (b.Start() < a.End() && b.End() > a.Start()) && SameChrom(a.Chrom(), b.Chrom())
 }
 
-func SameVariant(a, b IVariant) bool {
+// SameVariant tests if 2 IRefAlts share the same position and ref and alt.
+func SameVariant(a, b IRefAlt) bool {
 	if !SamePosition(a, b) || a.Ref() != b.Ref() {
 		return false
 	}
@@ -164,13 +186,15 @@ func SameVariant(a, b IVariant) bool {
 	return false
 }
 
+// Same tests the identity of 2 IPositions and attempts to cast to IRefAlts for more stringent
+// checking.
 func Same(a, b IPosition, strict bool) bool {
 	// strict only applies if both are IVariants, otherwise, we just check for overlap.
 	if !strict {
 		return OverlapsPosition(a, b)
 	}
-	if av, ok := a.(IVariant); ok {
-		if bv, ok := b.(IVariant); ok {
+	if av, ok := a.(IRefAlt); ok {
+		if bv, ok := b.(IRefAlt); ok {
 			if strict {
 				return SameVariant(av, bv)
 			}
