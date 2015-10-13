@@ -6,10 +6,8 @@ Streaming relation (overlap, distance, KNN) testing of (any number of) sorted fi
 Currently supports BED, BAM, GFF, VCF.
 
 [![GoDoc] (https://godoc.org/github.com/brentp/irelate?status.png)](https://godoc.org/github.com/brentp/irelate)
-<!--
 [![Build Status](https://travis-ci.org/brentp/irelate.svg?branch=master)](https://travis-ci.org/brentp/irelate)
 [![Coverage Status](https://coveralls.io/repos/brentp/irelate/badge.svg?branch=master)](https://coveralls.io/r/brentp/irelate?branch=master)
--->
 
 Motivation
 ----------
