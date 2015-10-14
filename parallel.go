@@ -69,7 +69,7 @@ func sliceToIterator(A []interfaces.Relatable) interfaces.RelatableIterator {
 	return &sliceIt{A, 0}
 }
 
-// make []interfaces.Relatable sortable.
+// islice makes []interfaces.Relatable sortable.
 type islice []interfaces.Relatable
 
 func (i islice) Len() int {
@@ -158,7 +158,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	// fromchannels receives lists of relatables ready to be sent to IRelate
 	fromchannels := make(chan []interfaces.RelatableIterator, 4)
 
-	// to channels recieves channels to accept intervals from IRelate to be sent for merging.
+	// to channels recieves channels that accept intervals from IRelate to be sent for merging.
 	// we send slices of intervals to reduce locking.
 	tochannels := make(chan chan []interfaces.Relatable, 8)
 
@@ -167,6 +167,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
 	sem := make(chan int, max(nprocs/2, 1))
 
+	// the user-defined callback runs int it's own goroutine.
 	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable), wg *sync.WaitGroup) {
 		for _, r := range rels {
 			fn(r)
@@ -335,6 +336,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	maxEnd := 0
 	idx := 0
 
+	// split the query intervals into chunks and send for processing to irelate.
 	go func() {
 
 		var fromWg sync.WaitGroup
