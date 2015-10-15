@@ -1,15 +1,17 @@
 This will serve as documentation for the parallel chromosome-sweep algorithm implemented 
-[irelate](https://github.com/brentp/irelate).
+in [irelate](https://github.com/brentp/irelate).
 
 Implementation
 --------------
 
 `chrom-sweep` is a means of intersecting sorted sets of intervals without using an
-interval tree or bin structure. As implemented here in `irelate`, there are these
-steps:
+interval tree or bin structure (e.g., the UCSC binning algorithm) whose memory 
+footprint scales poorly with input size. As implemented here in `irelate`, there 
+are the following steps:
 
-+ create an iterator of parsed intervals (BED/GFF/BAM) from all sets (sources)
-+ merge the intervals via a priority queue
++ create an iterator of parsed intervals (BED/GFF/BAM) from 
+  all (sorted) interval sets (sources)
++ merge the intervals via a priority queue, which maintains sort order
 + request an interval from the priority queue and insert it into a cache
 + check for overlaps with the newest interval and all items in the cache (and add
   overlaps to a list of pointers associated with each interval).
@@ -18,23 +20,23 @@ steps:
 
 An assumption here is that as soon as an interval in the cache does not overlap the in-coming
 interval, then it can not be related to any later intervals that would come in to the cache.
-This holds true since the intervals are sorted. It also means that we can test, not only for
-overlaps, but for K-nearest neighbors or for intervals within a certain distance. For this
-reason the "overlaps" function can be specified by the user making the implementation quite
-flexible.
+This holds true since the intervals are sorted by chromosome and then by start coordinate. 
+It also means that we can test, not only for overlaps, but for K-nearest neighbors or 
+for intervals within a certain distance. For this reason the "overlaps" function can be 
+specified by the user making the implementation quite flexible.
 
 Limitations
 -----------
 
 This algorithm is very fast, as evidenced by the [bedtools2 -sorted behavior](http://bedtools.readthedocs.org/en/latest/#performance)
-but it suffers 3 major problems:
+but it suffers from 3 major problems:
 
 1. It relies on having all chromosomes in the same order. This is especially onerous since
    VCFs coming out of GATK have order of `1,2,...21,X,Y,MT` while most other sorted files
    would put MT before X and Y. Of course sorting the numeric chromosomes as characters or
    integers also result in different sort orders.
 
-2. It parses many unneeded intervals. Given a sparse query, for example, a variants from a few
+2. It parses many unneeded intervals. Given a sparse query, for example, variants from a few
    target genes, and dense databases of whole-genome coverage, the chromosome sweep algorithm
    will have to parse *every interval* in the whole-genome databases, even though the areas of
    interest are comprised by less than 1% of the regions in the file. In short, sparse queries
@@ -54,19 +56,20 @@ array and sends the current one to be processed when one of these is true:
 + a chromosome change is detected
 + a gap (current start minus previous end) of a user-specified size is seen.
 
-The chunk-size helps to send reasonable, and reasonably even amounts of work to the user.
-The gap cutoff avoids putting distant query intervals together in the same array;
-this helps to parse fewer database intervals.
+The chunk-size helps to send reasonably even amounts of work to the user in support
+of efficient load balancing (i.e., to avoid task divergence). The gap cutoff avoids 
+putting distant query intervals together in the same array; this helps to parse fewer 
+database intervals.
 
-Once an array is complete it is sent off for the chrom-sweep in parallel as a new array
+Once an array is complete, it is sent off for the chrom-sweep in parallel as a new array
 accumulates; the bounds of the intervals it contains are determined and
 those are the basis for a tabix request to each database (or any indexed query). Those
 requested result in streams of intervals that are sent, along with the query array to
 chrom-sweep. This parallelizes quite well up to about a dozen processes because multiple
 chromosome-sweeps can be operating as the arrays accumulate. One difficulty is that
-we want the output to be sorted, so, even though each chunk may finish in any order, we
-must keep them in order to send the intersections back to the caller. This is likely the
-reason that we seem to asymptote in speed at about 10-12 processes.
+we want the output to be sorted; consequently, even though each chunk may finish in any 
+order, we must keep them in order to send the intersections back to the caller. 
+This is likely the reason that we seem to asymptote in speed at about 10-12 processes.
 
 Implementation
 --------------
