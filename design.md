@@ -64,11 +64,12 @@ database intervals.
 Once an array is complete, it is sent off for the chrom-sweep in parallel as a new array
 accumulates; the bounds of the intervals it contains are determined and
 those are the basis for a tabix request to each database (or any indexed query). Those
-requested result in streams of intervals that are sent, along with the query array to
-chrom-sweep. This parallelizes quite well up to about a dozen processes because multiple
-chromosome-sweeps can be operating as the arrays accumulate. One difficulty is that
-we want the output to be sorted; consequently, even though each chunk may finish in any 
-order, we must keep them in order to send the intersections back to the caller. 
+requested regions result in streams of intervals that are sent, along with the query array to
+chrom-sweep. This means that only the query chunk is in memory and the database intervals
+are retreived from their iterators. This parallelizes quite well up to about a dozen processes
+because multiple chromosome-sweeps can be operating as the arrays accumulate. One difficulty
+is that we want the output to be sorted; consequently, even though each chunk may finish in any 
+order, we must restore sorted order to send the intersections back to the caller. 
 This is likely the reason that we seem to asymptote in speed at about 10-12 processes.
 
 Implementation
