@@ -115,9 +115,11 @@ func makeStreams(fromWg *sync.WaitGroup, sem chan int, fromchannels chan []inter
 
 	streams := make([]interfaces.RelatableIterator, 0, len(dbs)+1)
 	streams = append(streams, sliceToIterator(A))
+	p := pos{lastChrom, minStart, maxEnd}
+	//time.Sleep(time.Millisecond * 150)
 
 	for _, db := range dbs {
-		stream, err := db.Query(pos{lastChrom, minStart, maxEnd})
+		stream, err := db.Query(p)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -152,20 +154,24 @@ func (ci ciRel) End() uint32 {
 // PIRelate implements a parallel IRelate
 func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExtend bool, fn func(interfaces.Relatable), dbs ...interfaces.Queryable) interfaces.RelatableChannel {
 	nprocs := runtime.GOMAXPROCS(-1)
+	_ = nprocs
 
 	// final interval stream sent back to caller.
-	intersected := make(chan interfaces.Relatable, 1024)
+	intersected := make(chan interfaces.Relatable, 256)
 	// fromchannels receives lists of relatables ready to be sent to IRelate
-	fromchannels := make(chan []interfaces.RelatableIterator, 4)
+	fromchannels := make(chan []interfaces.RelatableIterator, 1)
 
 	// to channels recieves channels that accept intervals from IRelate to be sent for merging.
 	// we send slices of intervals to reduce locking.
-	tochannels := make(chan chan []interfaces.Relatable, 8)
+	tochannels := make(chan chan []interfaces.Relatable, 0)
 
 	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
 
-	// in parallel (hence the nested go-routines) run IRelate on chunks of data.
-	sem := make(chan int, max(nprocs/2, 1))
+	sem := make(chan int, 1) //max(nprocs/2, 1))
+
+	// flowSem make sure we don't keep accepting work if there's nothing going out the other end, e.g.
+	// if the output gets piped to less.
+	flowSem := make(chan bool, (1+nprocs)*chunk)
 
 	// the user-defined callback runs int it's own goroutine.
 	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable), wg *sync.WaitGroup) {
@@ -217,6 +223,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 				for {
 					interval, err := iterator.Next()
 					if err == io.EOF {
+						iterator.Close()
 						break
 					}
 					saved[j] = interval
@@ -254,9 +261,11 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 				tochannels <- ochan
 				close(ochan)
 				//fwg.Done()
-				for i := range streams {
-					streams[i].Close()
-				}
+				/*
+					for i := range streams {
+						streams[i].Close()
+					}
+				*/
 				outerWg.Done()
 			}(streams)
 			//fwg.Add(1)
@@ -284,6 +293,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 					for _, interval := range intervals {
 						ci := interval.(ciRel)
 						if ci.index == nextPrint {
+							<-flowSem
 							intersected <- ci.Relatable
 							nextPrint++
 						} else {
@@ -294,6 +304,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 									break
 								}
 								delete(q, nextPrint)
+								<-flowSem
 								intersected <- n.Relatable
 								nextPrint++
 							}
@@ -307,6 +318,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 						break
 					}
 					delete(q, nextPrint)
+					<-flowSem
 					intersected <- n.Relatable
 					nextPrint++
 				}
@@ -320,6 +332,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 
 				for intervals := range ch {
 					for _, interval := range intervals {
+						<-flowSem
 						intersected <- interval
 					}
 				}
@@ -342,9 +355,11 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		var fromWg sync.WaitGroup
 		c := 0
 		for {
+			flowSem <- true
 			v, err := qstream.Next()
 			if err == io.EOF {
 				qstream.Close()
+				close(flowSem)
 			}
 			if v == nil {
 				break
@@ -372,9 +387,25 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 					c++
 					// send work to IRelate
 					if verbose {
+						var mem runtime.MemStats
+						runtime.ReadMemStats(&mem)
 						log.Println("work unit:", len(A), fmt.Sprintf("%s:%d-%d", lastChrom, minStart, maxEnd), "gap:", s-lastStart)
 						log.Println("\tc:", c, "fromchannels:", len(fromchannels), "tochannels:", len(tochannels), "intersected:", len(intersected))
+						log.Printf("\tmemory use: %dMB , heap in use: %dMB\n", mem.Alloc/uint64(1000*1000),
+							mem.HeapInuse/uint64(1000*1000))
 					}
+
+					// heuristic to call GC frequently enough to keep the memory use at a reasonable
+					//level. without this section, the memory seems to grow indefinitely in some cases.
+					/*
+						ratio := float64(chunk) / 1000.0
+						mod := float64(int(100.0 / ratio))
+						if math.Mod(float64(c), mod) == 0 {
+							if verbose {
+								log.Println("calling debug.FreeOSMemory()", c)
+							}
+							go func() { debug.FreeOSMemory() }()
+						}*/
 
 				}
 				lastStart = s
