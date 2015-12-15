@@ -196,7 +196,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		// close tochannels
 		var outerWg sync.WaitGroup
 		N := 1200
-		kMAX := runtime.GOMAXPROCS(-1)
+		kMAX := 5 // runtime.GOMAXPROCS(-1)
 		for {
 			streams, ok := <-fromchannels
 			if !ok {
