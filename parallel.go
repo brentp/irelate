@@ -107,7 +107,7 @@ func (p pos) End() uint32 {
 }
 
 // make a set of streams ready to be sent to irelate.
-func makeStreams(fromWg *sync.WaitGroup, sem chan int, fromchannels chan []interfaces.RelatableIterator, mustSort bool, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, dbs ...interfaces.Queryable) {
+func makeStreams(fromWg *sync.WaitGroup, fromchannels chan []interfaces.RelatableIterator, mustSort bool, A []interfaces.Relatable, lastChrom string, minStart int, maxEnd int, dbs ...interfaces.Queryable) {
 
 	if mustSort {
 		sort.Sort(islice(A))
@@ -126,7 +126,6 @@ func makeStreams(fromWg *sync.WaitGroup, sem chan int, fromchannels chan []inter
 		streams = append(streams, stream)
 	}
 	fromchannels <- streams
-	<-sem
 	fromWg.Done()
 }
 
@@ -154,10 +153,8 @@ func (ci ciRel) End() uint32 {
 // PIRelate implements a parallel IRelate
 func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExtend bool, fn func(interfaces.Relatable), dbs ...interfaces.Queryable) interfaces.RelatableChannel {
 	nprocs := runtime.GOMAXPROCS(-1)
-	_ = nprocs
-
 	// final interval stream sent back to caller.
-	intersected := make(chan interfaces.Relatable, 256)
+	intersected := make(chan interfaces.Relatable, 2048)
 	// fromchannels receives lists of relatables ready to be sent to IRelate
 	fromchannels := make(chan []interfaces.RelatableIterator, 1)
 
@@ -167,11 +164,9 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 
 	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
 
-	sem := make(chan int, 1) //max(nprocs/2, 1))
-
 	// flowSem make sure we don't keep accepting work if there's nothing going out the other end, e.g.
 	// if the output gets piped to less.
-	flowSem := make(chan bool, (1+nprocs)*chunk)
+	flowSem := make(chan struct{}, (1+nprocs)*chunk)
 
 	// the user-defined callback runs int it's own goroutine.
 	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable), wg *sync.WaitGroup) {
@@ -353,9 +348,10 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	go func() {
 
 		var fromWg sync.WaitGroup
+		empty := struct{}{}
 		c := 0
 		for {
-			flowSem <- true
+			flowSem <- empty
 			v, err := qstream.Next()
 			if err == io.EOF {
 				qstream.Close()
@@ -380,10 +376,9 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 			// 3. reaches chunkSize (and has at least a gap of 2 bases from last interval).
 			if v.Chrom() != lastChrom || (len(A) > 2048 && s-lastStart > maxGap) || ((s-lastStart > 25 && len(A) >= chunk) || len(A) >= chunk+100) || s-lastStart > 20*maxGap {
 				if len(A) > 0 {
-					sem <- 1
 					// if ciExtend is true, we have to sort A by the new start which incorporates CIPOS
 					fromWg.Add(1)
-					go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
+					go makeStreams(&fromWg, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
 					c++
 					// send work to IRelate
 					if verbose {
@@ -421,9 +416,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		}
 
 		if len(A) > 0 {
-			sem <- 1
 			fromWg.Add(1)
-			go makeStreams(&fromWg, sem, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
+			go makeStreams(&fromWg, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
 			c++
 		}
 		fromWg.Wait()
