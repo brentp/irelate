@@ -125,6 +125,7 @@ func makeStreams(fromWg *sync.WaitGroup, fromchannels chan []interfaces.Relatabl
 		}
 		streams = append(streams, stream)
 	}
+	//log.Println("sending:", lastChrom, minStart, maxEnd)
 	fromchannels <- streams
 	fromWg.Done()
 }
@@ -205,6 +206,8 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 			// number of intervals stuck at this pahse will be kMAX * N
 
 			saved := make([]interfaces.Relatable, N)
+			// NOTE: log.Println("added this wait removed ordering problems...")
+			outerWg.Wait()
 			outerWg.Add(1)
 			//fwg.Wait()
 			go func(streams []interfaces.RelatableIterator) {
@@ -256,11 +259,6 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 				tochannels <- ochan
 				close(ochan)
 				//fwg.Done()
-				/*
-					for i := range streams {
-						streams[i].Close()
-					}
-				*/
 				outerWg.Done()
 			}(streams)
 			//fwg.Add(1)
@@ -269,72 +267,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		close(tochannels)
 	}()
 
-	// merge the intervals from different channels keeping order.
-	go func() {
-		// 2 separate function code-blocks so there is no performance hit when they don't
-		// care about the cipos.
-		if ciExtend {
-			// we need to track that the intervals come out in the order they went in
-			// since we sort()'ed them based on the CIPOS.
-			nextPrint := 0
-			q := make(map[int]ciRel, 100)
-			for {
-				ch, ok := <-tochannels
-				if !ok {
-					break
-				}
-
-				for intervals := range ch {
-					for _, interval := range intervals {
-						ci := interval.(ciRel)
-						if ci.index == nextPrint {
-							<-flowSem
-							intersected <- ci.Relatable
-							nextPrint++
-						} else {
-							q[ci.index] = ci
-							for {
-								n, ok := q[nextPrint]
-								if !ok {
-									break
-								}
-								delete(q, nextPrint)
-								<-flowSem
-								intersected <- n.Relatable
-								nextPrint++
-							}
-						}
-					}
-				}
-				// empty out the q
-				for {
-					n, ok := q[nextPrint]
-					if !ok {
-						break
-					}
-					delete(q, nextPrint)
-					<-flowSem
-					intersected <- n.Relatable
-					nextPrint++
-				}
-			}
-		} else {
-			for {
-				ch, ok := <-tochannels
-				if !ok {
-					break
-				}
-
-				for intervals := range ch {
-					for _, interval := range intervals {
-						<-flowSem
-						intersected <- interval
-					}
-				}
-			}
-		}
-		close(intersected)
-	}()
+	go mergeIntervals(tochannels, intersected, flowSem, ciExtend)
 
 	A := make([]interfaces.Relatable, 0, chunk+100)
 
@@ -377,7 +310,9 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 			if v.Chrom() != lastChrom || (len(A) > 2048 && s-lastStart > maxGap) || ((s-lastStart > 25 && len(A) >= chunk) || len(A) >= chunk+100) || s-lastStart > 20*maxGap {
 				if len(A) > 0 {
 					// if ciExtend is true, we have to sort A by the new start which incorporates CIPOS
+					//fromWg.Wait()
 					fromWg.Add(1)
+					log.Println("out sending:", lastChrom, minStart, maxEnd)
 					go makeStreams(&fromWg, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
 					c++
 					// send work to IRelate
@@ -389,18 +324,6 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 						log.Printf("\tmemory use: %dMB , heap in use: %dMB\n", mem.Alloc/uint64(1000*1000),
 							mem.HeapInuse/uint64(1000*1000))
 					}
-
-					// heuristic to call GC frequently enough to keep the memory use at a reasonable
-					//level. without this section, the memory seems to grow indefinitely in some cases.
-					/*
-						ratio := float64(chunk) / 1000.0
-						mod := float64(int(100.0 / ratio))
-						if math.Mod(float64(c), mod) == 0 {
-							if verbose {
-								log.Println("calling debug.FreeOSMemory()", c)
-							}
-							go func() { debug.FreeOSMemory() }()
-						}*/
 
 				}
 				lastStart = s
@@ -416,6 +339,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		}
 
 		if len(A) > 0 {
+			//fromWg.Wait()
 			fromWg.Add(1)
 			go makeStreams(&fromWg, fromchannels, ciExtend, A, lastChrom, minStart, maxEnd, dbs...)
 			c++
@@ -423,6 +347,72 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		fromWg.Wait()
 		close(fromchannels)
 	}()
-
 	return intersected
+}
+
+func mergeIntervals(tochannels chan chan []interfaces.Relatable, intersected chan interfaces.Relatable, flowSem <-chan struct{}, ciExtend bool) {
+	// merge the intervals from different channels keeping order.
+	// 2 separate function code-blocks so there is no performance hit when they don't
+	// care about the cipos.
+	if ciExtend {
+		// we need to track that the intervals come out in the order they went in
+		// since we sort()'ed them based on the CIPOS.
+		nextPrint := 0
+		q := make(map[int]ciRel, 100)
+		for {
+			ch, ok := <-tochannels
+			if !ok {
+				break
+			}
+
+			for intervals := range ch {
+				for _, interval := range intervals {
+					ci := interval.(ciRel)
+					if ci.index == nextPrint {
+						<-flowSem
+						intersected <- ci.Relatable
+						nextPrint++
+					} else {
+						q[ci.index] = ci
+						for {
+							n, ok := q[nextPrint]
+							if !ok {
+								break
+							}
+							delete(q, nextPrint)
+							<-flowSem
+							intersected <- n.Relatable
+							nextPrint++
+						}
+					}
+				}
+			}
+			// empty out the q
+			for {
+				n, ok := q[nextPrint]
+				if !ok {
+					break
+				}
+				delete(q, nextPrint)
+				<-flowSem
+				intersected <- n.Relatable
+				nextPrint++
+			}
+		}
+	} else {
+		for {
+			ch, ok := <-tochannels
+			if !ok {
+				break
+			}
+
+			for intervals := range ch {
+				for _, interval := range intervals {
+					<-flowSem
+					intersected <- interval
+				}
+			}
+		}
+	}
+	close(intersected)
 }
