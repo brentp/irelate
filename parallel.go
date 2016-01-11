@@ -154,59 +154,83 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	intersected := make(chan interfaces.Relatable, 2048)
 
 	// this keeps the interval chunks in order.
-	receivers := make(chan chan []interfaces.RelatableIterator, nprocs+1)
+	receivers := make(chan chan []interfaces.RelatableIterator, 1)
 
 	// to channels recieves channels that accept intervals from IRelate to be sent for merging.
 	// we send slices of intervals to reduce locking.
-	tochannels := make(chan chan []interfaces.Relatable, (1+nprocs)*2)
+	tochannels := make(chan chan chan []interfaces.Relatable, 2+nprocs/2)
 
 	verbose := os.Getenv("IRELATE_VERBOSE") == "TRUE"
 
 	// the user-defined callback runs int it's own goroutine.
 	// call on the relatable itself. but with all of the associated intervals.
-	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable)) {
-		for _, r := range rels {
-			fn(r)
-		}
-
+	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable)) chan []interfaces.Relatable {
+		ch := make(chan []interfaces.Relatable, 0)
+		go func() {
+			for _, r := range rels {
+				fn(r)
+			}
+			ch <- rels
+			close(ch)
+		}()
+		return ch
 	}
 	if ciExtend {
-		work = func(rels []interfaces.Relatable, fn func(interfaces.Relatable)) {
-			for _, r := range rels {
-				fn(r.(ciRel).Relatable)
-			}
+
+		work = func(rels []interfaces.Relatable, fn func(interfaces.Relatable)) chan []interfaces.Relatable {
+			ch := make(chan []interfaces.Relatable, 0)
+			go func() {
+				for _, r := range rels {
+					fn(r.(ciRel).Relatable)
+				}
+				ch <- rels
+				close(ch)
+			}()
+			return ch
+
 		}
 	}
 
 	// pull the intervals from IRelate, call fn() and (via work()) send chunks to be merged.
+	// calling fn() is a bottleneck. so we make sub-chunks and process them in a separate go-routine
+	// in work()
+	// inner channel keeps track of the order for each big chunk
 	go func() {
 
 		for streamsChan := range receivers {
 
-			inner := make(chan []interfaces.Relatable, 0)
+			inner := make(chan chan []interfaces.Relatable, nprocs)
 			tochannels <- inner
 
 			// push a channel to to channels out here
 			// and then push to that channel inside this goroutine.
 			// this maintains order of the intervals.
 			go func(streams []interfaces.RelatableIterator) {
-				saved := make([]interfaces.Relatable, 0, chunk+200)
-
+				N := 400
+				//saved := make([]interfaces.Relatable, N)
 				iterator := IRelate(checkOverlap, 0, less, streams...)
+				saved := make([]interfaces.Relatable, N)
+				k := 0
 
 				for {
-					// option: split into chunks and send for processing since this loop can
-					// be a bottleneck and we may want to send finer chunks for better parallelization.
-					// then innner := chan chan []interfaces.Relatable
 					interval, err := iterator.Next()
 					if err == io.EOF {
 						iterator.Close()
 						break
 					}
-					saved = append(saved, interval)
+					saved[k] = interval
+					k++
+
+					if k == N {
+						inner <- work(saved, fn)
+						k = 0
+						saved = make([]interfaces.Relatable, N)
+					}
+
 				}
-				work(saved, fn)
-				inner <- saved
+				if k > 0 {
+					inner <- work(saved[:k], fn)
+				}
 				close(inner)
 			}(<-streamsChan) // only one, just used a chan for ordering.
 		}
@@ -293,52 +317,54 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	return intersected
 }
 
-func mergeIntervals(tochannels chan chan []interfaces.Relatable, intersected chan interfaces.Relatable, ciExtend bool) {
+func mergeIntervals(tochannels chan chan chan []interfaces.Relatable, intersected chan interfaces.Relatable, ciExtend bool) {
 	// merge the intervals from different channels keeping order.
 	// 2 separate function code-blocks so there is no performance hit when they don't
 	// care about the cipos.
 	if ciExtend {
-		// we need to track that the intervals come out in the order they went in
-		// since we sort()'ed them based on the CIPOS.
 		nextPrint := 0
 		q := make(map[int]ciRel, 100)
-		for ch := range tochannels {
-			for intervals := range ch {
-				for _, interval := range intervals {
-					ci := interval.(ciRel)
-					if ci.index == nextPrint {
-						intersected <- ci.Relatable
-						nextPrint++
-					} else {
-						q[ci.index] = ci
-						for {
-							n, ok := q[nextPrint]
-							if !ok {
-								break
-							}
-							delete(q, nextPrint)
-							intersected <- n.Relatable
+		for och := range tochannels {
+			for ch := range och {
+				for intervals := range ch {
+					for _, interval := range intervals {
+						ci := interval.(ciRel)
+						if ci.index == nextPrint {
+							intersected <- ci.Relatable
 							nextPrint++
+						} else {
+							q[ci.index] = ci
+							for {
+								n, ok := q[nextPrint]
+								if !ok {
+									break
+								}
+								delete(q, nextPrint)
+								intersected <- n.Relatable
+								nextPrint++
+							}
 						}
 					}
-				}
-				// empty out the q
-				for {
-					n, ok := q[nextPrint]
-					if !ok {
-						break
+					// empty out the q
+					for {
+						n, ok := q[nextPrint]
+						if !ok {
+							break
+						}
+						delete(q, nextPrint)
+						intersected <- n.Relatable
+						nextPrint++
 					}
-					delete(q, nextPrint)
-					intersected <- n.Relatable
-					nextPrint++
 				}
 			}
 		}
 	} else {
-		for ch := range tochannels {
-			for intervals := range ch {
-				for _, interval := range intervals {
-					intersected <- interval
+		for och := range tochannels {
+			for ch := range och {
+				for intervals := range ch {
+					for _, interval := range intervals {
+						intersected <- interval
+					}
 				}
 			}
 		}
