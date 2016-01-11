@@ -1,5 +1,34 @@
 package irelate
 
+// parallel implements a parallel chrom-sweep.
+// broad design is covered in design.md in the irelate package directory.
+// In actual fact, there are a number of complexities; most of them relate to
+// maintaining intervals in sorted order (and keeping chunks in sorted order)
+// while allowing a good level of parallelism.
+
+// more detailed explanations are provided whenever a channel is initialized
+// as channels are our main means of keeping order.
+// For example
+//     tochannels := make(chan chan chan []interfaces.Relatable, 2+nprocs/2)
+// Seems to have excessive use of channels, but we actually do need this since
+// we have 2 levels of parallelization.
+// One level is by chunk of query intervals.
+// The next is by sub-chunk within the query chunks.
+// The 3rd chan is a place-holder so that the work() function, which calls
+// the user-defined fn() can be done concurrently (in a go routine).
+
+// The broad pattern used throughout is to send a channel (K) into another
+// channel (PARENT) to keep order and then send K into a worker goroutine
+// that sends intervals or []intervals into K.
+
+// I have done much tuning; the areas that affect performance are how the work()
+// is parallelized (see the code-block that calls work()). And how the query
+// chunks are determined. If the query chunks are too small (< 100 intervals),
+// we have a lot of overhead in tracking that chunk that only requires a little
+// computation. Unless the databases are very dense, then having the query chunks
+// quite large helps parallelization. This is an area of potential optimization,
+// though no obvious candidates have emerged.
+
 import (
 	"fmt"
 	"io"
@@ -153,7 +182,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	// final interval stream sent back to caller.
 	intersected := make(chan interfaces.Relatable, 2048)
 
-	// this keeps the interval chunks in order.
+	// receivers keeps the interval chunks in order.
 	receivers := make(chan chan []interfaces.RelatableIterator, 1)
 
 	// to channels recieves channels that accept intervals from IRelate to be sent for merging.
