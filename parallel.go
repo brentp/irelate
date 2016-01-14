@@ -183,7 +183,7 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	intersected := make(chan interfaces.Relatable, 2048)
 
 	// receivers keeps the interval chunks in order.
-	receivers := make(chan chan []interfaces.RelatableIterator, 1)
+	receivers := make(chan chan []interfaces.RelatableIterator, 2)
 
 	// to channels recieves channels that accept intervals from IRelate to be sent for merging.
 	// we send slices of intervals to reduce locking.
