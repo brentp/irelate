@@ -28,8 +28,11 @@ func benchmarkStreams(nStreams int, b *testing.B) {
 			a, err := iter.Next()
 			if err != nil {
 				break
-				a.Start()
 			}
+			a.Start()
+		}
+		for _, s := range streams {
+			s.Close()
 		}
 
 	}
