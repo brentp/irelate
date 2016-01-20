@@ -3,7 +3,6 @@
 package parsers
 
 import (
-	"compress/gzip"
 	"fmt"
 	"io"
 	"log"
@@ -11,8 +10,6 @@ import (
 	"strings"
 
 	"github.com/biogo/hts/bam"
-	"github.com/biogo/hts/bgzf"
-	"github.com/biogo/hts/bgzf/index"
 	"github.com/biogo/hts/sam"
 	"github.com/brentp/irelate/interfaces"
 )
@@ -109,7 +106,6 @@ type BamQueryable struct {
 	idx  *bam.Index
 	path string
 	file io.Reader
-	bgzf *bgzf.Reader
 	refs map[string]*sam.Reference
 }
 
@@ -119,12 +115,10 @@ func NewBamQueryable(path string, workers ...int) (*BamQueryable, error) {
 		return nil, err
 	}
 	defer f.Close()
-	gz, err := gzip.NewReader(f)
+	idx, err := bam.ReadIndex(f)
 	if err != nil {
 		return nil, err
 	}
-	defer gz.Close()
-	idx, err := bam.ReadIndex(gz)
 
 	b, err := os.Open(path)
 	if err != nil {
@@ -135,12 +129,7 @@ func NewBamQueryable(path string, workers ...int) (*BamQueryable, error) {
 		n = workers[0]
 	}
 
-	bgz, err := bgzf.NewReader(b, n)
-	if err != nil {
-		return nil, err
-	}
-
-	br, err := bam.NewReader(bgz, 1)
+	br, err := bam.NewReader(b, n)
 	if err != nil {
 		return nil, err
 	}
@@ -151,10 +140,11 @@ func NewBamQueryable(path string, workers ...int) (*BamQueryable, error) {
 	}
 	br.Close()
 
-	return &BamQueryable{idx: idx, path: path, file: b, bgzf: bgz, refs: refs}, nil
+	return &BamQueryable{idx: idx, path: path, file: b, refs: refs}, nil
 
 }
 
+// make a copy so we can mess with the file pointers.
 func newShort(old *BamQueryable) (*BamQueryable, error) {
 	b := &BamQueryable{
 		idx:  old.idx,
@@ -166,7 +156,6 @@ func newShort(old *BamQueryable) (*BamQueryable, error) {
 	if err != nil {
 		return nil, err
 	}
-	b.bgzf, err = bgzf.NewReader(b.file, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +182,15 @@ func (b *BamQueryable) Query(region interfaces.IPosition) (interfaces.RelatableI
 
 	ch := make(chan interfaces.Relatable, 100)
 	go func() {
+		brdr, err := bam.NewReader(bn.file, 1)
+		if err != nil {
+			close(ch)
+			if err != io.EOF {
+				log.Println(err)
+			}
+			return
+		}
+		defer brdr.Close()
 		chrom := ref.Name()
 		chunks, err := bn.idx.Chunks(ref, int(region.Start()), int(region.End()))
 		if err != nil {
@@ -202,40 +200,28 @@ func (b *BamQueryable) Query(region interfaces.IPosition) (interfaces.RelatableI
 			close(ch)
 			return
 		}
-		cr, err := index.NewChunkReader(bn.bgzf, chunks)
+		it, err := bam.NewIterator(brdr, chunks)
 		if err != nil {
 			if err != io.EOF {
 				log.Println(err)
 			}
+			it.Close()
 			close(ch)
 			return
 		}
-		br, err := bam.NewReader(cr, 2)
-		if err != nil {
-			if err != io.EOF {
-				log.Println(err)
+		for it.Next() {
+			rec := it.Record()
+			b := &Bam{Record: rec, Chromosome: chrom, related: nil}
+			if b.Start() < region.End() && b.End() > region.Start() {
+				ch <- b
 			}
-			close(ch)
-			return
 		}
-		for {
-			rec, err := br.Read()
-			if err != nil {
-				if err != io.EOF {
-					log.Println(err)
-				}
-				break
-			}
-			ch <- &Bam{Record: rec, Chromosome: chrom, related: nil}
-		}
-		br.Close()
 		close(ch)
 	}()
 	return &BamIterator{ch, bn}, nil
 }
 
 func (b *BamQueryable) Close() error {
-	b.bgzf.Close()
 	if cr, ok := b.file.(io.ReadCloser); ok {
 		cr.Close()
 	}
