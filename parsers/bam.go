@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/biogo/hts/bam"
+	"github.com/biogo/hts/bgzf/index"
 	"github.com/biogo/hts/sam"
 	"github.com/brentp/irelate/interfaces"
 )
@@ -180,7 +181,7 @@ func (b *BamQueryable) Query(region interfaces.IPosition) (interfaces.RelatableI
 		return nil, fmt.Errorf("%s not found in %s", region.Chrom(), bn.path)
 	}
 
-	ch := make(chan interfaces.Relatable, 100)
+	ch := make(chan interfaces.Relatable, 20)
 	go func() {
 		brdr, err := bam.NewReader(bn.file, 1)
 		if err != nil {
@@ -194,7 +195,7 @@ func (b *BamQueryable) Query(region interfaces.IPosition) (interfaces.RelatableI
 		chrom := ref.Name()
 		chunks, err := bn.idx.Chunks(ref, int(region.Start()), int(region.End()))
 		if err != nil {
-			if err != io.EOF {
+			if err != io.EOF && err != index.ErrInvalid {
 				log.Println(err)
 			}
 			close(ch)
@@ -212,11 +213,17 @@ func (b *BamQueryable) Query(region interfaces.IPosition) (interfaces.RelatableI
 		for it.Next() {
 			rec := it.Record()
 			b := &Bam{Record: rec, Chromosome: chrom, related: nil}
-			if b.Start() < region.End() && b.End() > region.Start() {
+			if rec.Start() >= int(region.End()) {
+				break
+			}
+			if b.End() > region.Start() {
 				ch <- b
+				//log.Printf("%s: %s:%d-%d is in %+v", b.Name, b.Chrom(), b.Start(), b.End(), region)
+				//log.Println(len(ch))
 			}
 		}
 		close(ch)
+		it.Close()
 	}()
 	return &BamIterator{ch, bn}, nil
 }
@@ -247,7 +254,7 @@ func NewBamIterator(f string) (*BamIterator, error) {
 
 func (b *BamIterator) Close() error {
 	if b.b != nil {
-		return b.Close()
+		return b.b.Close()
 	}
 	return nil
 }
