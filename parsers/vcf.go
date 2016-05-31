@@ -23,7 +23,7 @@ func NewVariant(v interfaces.IVariant, source uint32, related []interfaces.Relat
 
 func (v *Variant) AddRelated(r interfaces.Relatable) {
 	if len(v.related) == 0 {
-		v.related = make([]interfaces.Relatable, 0, 12)
+		v.related = make([]interfaces.Relatable, 0, 2)
 	}
 	v.related = append(v.related, r)
 }

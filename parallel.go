@@ -170,11 +170,11 @@ type ciRel struct {
 }
 
 func (ci ciRel) Start() uint32 {
-	return uint32(getStart(ci, int(ci.Relatable.Start())))
+	return uint32(getStart(ci.Relatable, int(ci.Relatable.Start())))
 }
 
 func (ci ciRel) End() uint32 {
-	return uint32(getEnd(ci, int(ci.Relatable.End())))
+	return uint32(getEnd(ci.Relatable, int(ci.Relatable.End())))
 }
 
 // PIRelate implements a parallel IRelate

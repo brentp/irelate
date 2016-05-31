@@ -65,6 +65,7 @@ type IRefAlt interface {
 // IVariant must implement IPosition, Ref, Alt, and Info() methods for genetic variants
 type IVariant interface {
 	IRefAlt
+	CIFace
 	Info() Info
 	Id() string
 	String() string
