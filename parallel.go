@@ -54,7 +54,7 @@ func getEnd(v interfaces.Relatable, e int) int {
 	if ci, ok := v.(interfaces.CIFace); ok {
 		_, b, ok := ci.CIEnd()
 		if ok && int(b) > e {
-			return int(e)
+			return int(b)
 		}
 	}
 	return e
