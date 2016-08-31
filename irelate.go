@@ -102,11 +102,18 @@ func filter(s []Relatable, nils int) []Relatable {
 
 type irelate struct {
 	checkRelated func(a, b Relatable) bool
-	relativeTo   int
-	less         func(a, b Relatable) bool
-	//streams      []RelatableIterator
-	cache       []Relatable
-	sendQ       *relatableQueue
+	// relativeTo indicates which stream is the query stream. A value of -1 means
+	// all vs all.
+	relativeTo int
+	less       func(a, b Relatable) bool
+	// cache holds the set of Relatables we must test for overlap. A Relatable
+	// is ejected from the cache when it is not related to the interval that's
+	// about to be added.
+	cache []Relatable
+	// an item eject from the cache gets put on the sendQ if it's from the query
+	// stream.
+	sendQ *relatableQueue
+	// mergeStream creates a single (sorted) stream of all incoming intervals.
 	mergeStream RelatableIterator
 	//merger RelatableChannel
 	nils int
@@ -145,6 +152,7 @@ func (ir *irelate) Next() (Relatable, error) {
 		if err == io.EOF {
 			break
 		}
+		// check the interval against everything in the cache.
 		for i, c := range ir.cache {
 			if c == nil {
 				continue
@@ -152,6 +160,8 @@ func (ir *irelate) Next() (Relatable, error) {
 			if ir.checkRelated(c, interval) {
 				relate(c, interval, ir.relativeTo)
 			} else {
+				// if it's not related, we remove it from the cache
+				// if it's a query interval, we push it onto the sendQ.
 				if ir.relativeTo == -1 || int(c.Source()) == ir.relativeTo {
 					heap.Push(ir.sendQ, c)
 				}
@@ -161,23 +171,29 @@ func (ir *irelate) Next() (Relatable, error) {
 		}
 
 		// only do this when we have a lot of nils as it's expensive to create a new slice.
-		if ir.nils > 0 {
-			// remove nils from the cache (must do this before sending)
-			ir.cache, ir.nils = filter(ir.cache, ir.nils), 0
-			var o Relatable
-			if len(ir.sendQ.rels) > 0 {
-				o = ir.sendQ.rels[0]
-			} else {
-				o = nil
-			}
-			if o != nil && (len(ir.cache) == 0 || ir.less(o, ir.cache[0])) {
-				ir.cache = append(ir.cache, interval)
-				return heap.Pop(ir.sendQ).(Relatable), nil
-			}
+		// nils are spaces that we've removed from the cache.
+		if ir.nils < 2 {
+			ir.cache = append(ir.cache, interval)
+			continue
+		}
+		// remove nils from the cache (must do this before sending)
+		ir.cache, ir.nils = filter(ir.cache, ir.nils), 0
+		var o Relatable
+		if len(ir.sendQ.rels) > 0 {
+			o = ir.sendQ.rels[0]
+		}
+		// if the first thing in the sendQ is less than the first thing in the cache
+		// then we can send Pop the lowest thing off the sendQ.
+		// otherwise, we continue to read from the stream.
+		if o != nil && (len(ir.cache) == 0 || ir.less(o, ir.cache[0])) {
+			ir.cache = append(ir.cache, interval)
+			return heap.Pop(ir.sendQ).(Relatable), nil
 		}
 		ir.cache = append(ir.cache, interval)
 	}
+	// stream is done so we empty the cache by pushing onto the sendQ
 	if len(ir.cache) > 0 {
+		ir.cache, ir.nils = filter(ir.cache, ir.nils), 0
 		for _, c := range ir.cache {
 			if ir.relativeTo == -1 || int(c.Source()) == ir.relativeTo {
 				heap.Push(ir.sendQ, c)
@@ -185,6 +201,7 @@ func (ir *irelate) Next() (Relatable, error) {
 		}
 		ir.cache = ir.cache[:0]
 	}
+	// ... then we clear the sendQ
 	if len(ir.sendQ.rels) > 0 {
 		return heap.Pop(ir.sendQ).(Relatable), nil
 	}

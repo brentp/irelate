@@ -1,2 +1,5 @@
-for i in range(10000):
-    print "chr1\t%i\t%i" % (i, i + 4000)
+for chrom in range(1, 20):
+    for i in range(100000):
+        print "chr%s\t%i\t%i" % (chrom, i, i + 40)
+    for x in range(10):
+        print "chr%s\t%i\t%i" % (chrom, i + 50, i + 60)

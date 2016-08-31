@@ -57,7 +57,7 @@ func main() {
 		queryables[i] = q
 	}
 
-	for interval := range irelate.PIRelate(80000, 25000, bx, false, func(a I.Relatable) {}, queryables...) {
+	for interval := range irelate.PIRelate(4000, 25000, bx, false, nil, queryables...) {
 		fmt.Fprintf(buf, "%s\t%d\t%d\t%d\n", interval.Chrom(), interval.Start(), interval.End(), len(interval.Related()))
 	}
 	buf.Flush()

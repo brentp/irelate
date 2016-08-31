@@ -197,8 +197,10 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 	work := func(rels []interfaces.Relatable, fn func(interfaces.Relatable)) chan []interfaces.Relatable {
 		ch := make(chan []interfaces.Relatable, 0)
 		go func() {
-			for _, r := range rels {
-				fn(r)
+			if fn != nil {
+				for _, r := range rels {
+					fn(r)
+				}
 			}
 			ch <- rels
 			close(ch)
@@ -210,8 +212,10 @@ func PIRelate(chunk int, maxGap int, qstream interfaces.RelatableIterator, ciExt
 		work = func(rels []interfaces.Relatable, fn func(interfaces.Relatable)) chan []interfaces.Relatable {
 			ch := make(chan []interfaces.Relatable, 0)
 			go func() {
-				for _, r := range rels {
-					fn(r.(ciRel).Relatable)
+				if fn != nil {
+					for _, r := range rels {
+						fn(r.(ciRel).Relatable)
+					}
 				}
 				ch <- rels
 				close(ch)
