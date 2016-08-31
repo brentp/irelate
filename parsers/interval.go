@@ -30,13 +30,9 @@ func (i *Interval) Start() uint32                   { return i.start }
 func (i *Interval) End() uint32                     { return i.end }
 func (i *Interval) Related() []interfaces.Relatable { return i.related }
 func (i *Interval) AddRelated(b interfaces.Relatable) {
-	if i.related == nil {
-		i.related = make([]interfaces.Relatable, 1, 4)
-		i.related[0] = b
-	} else {
-		i.related = append(i.related, b)
-	}
+	i.related = append(i.related, b)
 }
+
 func (i *Interval) Source() uint32       { return i.source }
 func (i *Interval) SetSource(src uint32) { i.source = src }
 
