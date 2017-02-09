@@ -63,6 +63,7 @@ func IntervalFromBedLine(line []byte) (interfaces.Relatable, error) {
 type RefAltInterval struct {
 	Interval
 	refalt [2]int
+	HasEnd bool
 }
 
 func (i *RefAltInterval) SetRefAlt(ra []int) {
@@ -77,6 +78,13 @@ func (i *RefAltInterval) Ref() string {
 func (i *RefAltInterval) Alt() []string {
 	f := string(i.Fields[i.refalt[1]])
 	return strings.Split(f, ",")
+}
+
+func (i *RefAltInterval) End() uint32 {
+	if i.HasEnd {
+		return i.Interval.End()
+	}
+	return i.Start() + uint32(len(i.Ref()))
 }
 
 var _ interfaces.IRefAlt = (*RefAltInterval)(nil)
