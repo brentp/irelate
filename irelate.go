@@ -170,7 +170,7 @@ func (ir *irelate) Next() (Relatable, error) {
 			} else {
 				// if it's not related, we remove it from the cache
 				// if it's a query interval, we push it onto the sendQ.
-				if ir.relativeTo == -1 || int(c.Source()) == ir.relativeTo {
+				if ir.relativeTo < 0 || int(c.Source()) == ir.relativeTo {
 					heap.Push(ir.sendQ, c)
 				}
 				ir.cache[i] = nil
@@ -203,7 +203,7 @@ func (ir *irelate) Next() (Relatable, error) {
 	if len(ir.cache) > 0 {
 		ir.cache, ir.nils = filter(ir.cache, ir.nils), 0
 		for _, c := range ir.cache {
-			if ir.relativeTo == -1 || int(c.Source()) == ir.relativeTo {
+			if ir.relativeTo < 0 || int(c.Source()) == ir.relativeTo {
 				heap.Push(ir.sendQ, c)
 			}
 		}
