@@ -11,7 +11,15 @@ import (
 	. "github.com/brentp/irelate/interfaces"
 )
 
+// Set relativeTo so SelfRelations constant to allow reporting overlaps within a stream
+const SelfRelations = -2
+
 func relate(a Relatable, b Relatable, relativeTo int) {
+	if relativeTo == SelfRelations {
+		a.AddRelated(b)
+		b.AddRelated(a)
+		return
+	}
 	if a.Source() != b.Source() {
 		if relativeTo == -1 {
 			a.AddRelated(b)
@@ -103,7 +111,7 @@ func filter(s []Relatable, nils int) []Relatable {
 type irelate struct {
 	checkRelated func(a, b Relatable) bool
 	// relativeTo indicates which stream is the query stream. A value of -1 means
-	// all vs all.
+	// all vs all. A value of -2 reports overlaps even within the same stream.
 	relativeTo int
 	less       func(a, b Relatable) bool
 	// cache holds the set of Relatables we must test for overlap. A Relatable
@@ -225,6 +233,9 @@ func newMerger(less func(a, b Relatable) bool, relativeTo int, streams ...Relata
 
 	for i, stream := range streams {
 		interval, err := stream.Next()
+		if err != nil && err != io.EOF {
+			panic(err)
+		}
 		if interval != nil {
 			interval.SetSource(uint32(i))
 			heap.Push(&q, interval)
