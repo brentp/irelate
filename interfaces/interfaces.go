@@ -184,6 +184,9 @@ func SameVariant(a, b IRefAlt) bool {
 			}
 		}
 	}
+	if a.Alt()[0] == "<NON_REF>" || b.Alt()[0] == "<NON_REF>" {
+		return true
+	}
 	return false
 }
 
