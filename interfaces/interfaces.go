@@ -172,14 +172,39 @@ func OverlapsPosition(a, b IPosition) bool {
 	return (b.Start() < a.End() && b.End() > a.Start()) && SameChrom(a.Chrom(), b.Chrom())
 }
 
+// EqualFoldASCIIFast reports whether s and t are equal under ASCII case-folding.
+// It is faster than strings.EqualFold for purely ASCII inputs.
+func EqualFoldASCIIFast(s, t string) bool {
+	if len(s) != len(t) {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		sb := s[i]
+		tb := t[i]
+		if sb == tb {
+			continue
+		}
+		// ASCII letters of opposite case differ by exactly 0x20.
+		if sb^tb != 0x20 {
+			return false
+		}
+		// Make sure the character is actually A-Z/a-z.
+		c := sb | 0x20
+		if c < 'a' || c > 'z' {
+			return false
+		}
+	}
+	return true
+}
+
 // SameVariant tests if 2 IRefAlts share the same position and ref and alt.
 func SameVariant(a, b IRefAlt) bool {
-	if !SamePosition(a, b) || a.Ref() != b.Ref() {
+	if !SamePosition(a, b) || !EqualFoldASCIIFast(a.Ref(), b.Ref()) {
 		return false
 	}
 	for _, aalt := range a.Alt() {
 		for _, balt := range b.Alt() {
-			if aalt == balt {
+			if EqualFoldASCIIFast(aalt, balt) {
 				return true
 			}
 		}
