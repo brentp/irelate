@@ -172,9 +172,12 @@ func OverlapsPosition(a, b IPosition) bool {
 	return (b.Start() < a.End() && b.End() > a.Start()) && SameChrom(a.Chrom(), b.Chrom())
 }
 
-// EqualFoldASCIIFast reports whether s and t are equal under ASCII case-folding.
-// It is faster than strings.EqualFold for purely ASCII inputs.
-func EqualFoldASCIIFast(s, t string) bool {
+// equalFoldASCII reports whether s and t are equal under ASCII case
+// folding only: A-Z/a-z fold to each other, every other byte (including all
+// non-ASCII) must match exactly. It is NOT equivalent to strings.EqualFold,
+// which also applies Unicode simple folding. Intended for comparing REF and ALT
+// VCF fields, which are limited to A, C, G, T, N by spec.
+func equalFoldASCII(s, t string) bool {
 	if len(s) != len(t) {
 		return false
 	}
@@ -199,12 +202,12 @@ func EqualFoldASCIIFast(s, t string) bool {
 
 // SameVariant tests if 2 IRefAlts share the same position and ref and alt.
 func SameVariant(a, b IRefAlt) bool {
-	if !SamePosition(a, b) || !EqualFoldASCIIFast(a.Ref(), b.Ref()) {
+	if !SamePosition(a, b) || !equalFoldASCII(a.Ref(), b.Ref()) {
 		return false
 	}
 	for _, aalt := range a.Alt() {
 		for _, balt := range b.Alt() {
-			if EqualFoldASCIIFast(aalt, balt) {
+			if equalFoldASCII(aalt, balt) {
 				return true
 			}
 		}
