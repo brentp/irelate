@@ -1,0 +1,17 @@
+github.com/biogo/boom v0.0.0-20150317015657-28119bc1ffc1 h1:LAHY5JxqhOgJDeDBGKsQ4300qd3sG8C0j5CQS8gD+Kw=
+github.com/biogo/boom v0.0.0-20150317015657-28119bc1ffc1/go.mod h1:fwtxkutinkQcME9Zlywh66T0jZLLjgrwSLY2WxH2N3U=
+github.com/biogo/hts v1.4.5 h1:mhVCpZaTYlAhBjMaAATGWBnauioBtmvOb0ApLdU4/+0=
+github.com/biogo/hts v1.4.5/go.mod h1:GgiMFa6c4eEkwS3kCBRPv3oPgtRm7L8SXvdE9nICnYc=
+github.com/brentp/bix v0.0.0-20250701183917-000f089eabc0 h1:F/nIyfoykz+0maEjNiSLTA8o9fZSwa/MTt7MP+awTes=
+github.com/brentp/bix v0.0.0-20250701183917-000f089eabc0/go.mod h1:l0g9nyO24iJMuPEQecNZryJPKfcNgHJQY5cDEB8mBaQ=
+github.com/brentp/vcfgo v0.0.0-20250902214554-a31336cef488 h1:kkdQjzmPByd/OTSedx5LAIsNjPgHTxzQv9OcBMTshi0=
+github.com/brentp/vcfgo v0.0.0-20250902214554-a31336cef488/go.mod h1:DDMWmbbsIQXT6k6RvgvlI1AGtjaYVr5de1c+ATUw9ls=
+github.com/kr/pretty v0.2.1 h1:Fmg33tUaq4/8ym9TJN1x7sLJnHVwhP33CNkpYV/7rwI=
+github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
+github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
+github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
+github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
+gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
