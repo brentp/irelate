@@ -39,11 +39,11 @@ type mockRefAlt struct {
 	alt   []string
 }
 
-func (m mockRefAlt) Chrom() string  { return m.chrom }
-func (m mockRefAlt) Start() uint32  { return m.start }
-func (m mockRefAlt) End() uint32    { return m.end }
-func (m mockRefAlt) Ref() string    { return m.ref }
-func (m mockRefAlt) Alt() []string  { return m.alt }
+func (m mockRefAlt) Chrom() string { return m.chrom }
+func (m mockRefAlt) Start() uint32 { return m.start }
+func (m mockRefAlt) End() uint32   { return m.end }
+func (m mockRefAlt) Ref() string   { return m.ref }
+func (m mockRefAlt) Alt() []string { return m.alt }
 
 func TestSameVariant(t *testing.T) {
 	base := mockRefAlt{"chr1", 100, 101, "A", []string{"T"}}
@@ -123,6 +123,18 @@ func TestSameVariant(t *testing.T) {
 			desc: "multi-alt: no matching alt",
 			a:    mockRefAlt{"chr1", 100, 101, "A", []string{"G", "C"}},
 			b:    mockRefAlt{"chr1", 100, 101, "A", []string{"T"}},
+			want: false,
+		},
+		{
+			desc: "empty alt on left",
+			a:    mockRefAlt{"chr1", 100, 101, "A", []string{}},
+			b:    base,
+			want: false,
+		},
+		{
+			desc: "empty alt on right",
+			a:    base,
+			b:    mockRefAlt{"chr1", 100, 101, "A", []string{}},
 			want: false,
 		},
 	}

@@ -205,14 +205,19 @@ func SameVariant(a, b IRefAlt) bool {
 	if !SamePosition(a, b) || !equalFoldASCII(a.Ref(), b.Ref()) {
 		return false
 	}
-	for _, aalt := range a.Alt() {
-		for _, balt := range b.Alt() {
+	aalts := a.Alt()
+	balts := b.Alt()
+	for _, aalt := range aalts {
+		for _, balt := range balts {
 			if equalFoldASCII(aalt, balt) {
 				return true
 			}
 		}
 	}
-	if a.Alt()[0] == "<NON_REF>" || b.Alt()[0] == "<NON_REF>" {
+	if len(aalts) == 0 || len(balts) == 0 {
+		return false
+	}
+	if aalts[0] == "<NON_REF>" || balts[0] == "<NON_REF>" {
 		return true
 	}
 	return false
